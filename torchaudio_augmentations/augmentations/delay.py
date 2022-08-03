@@ -33,16 +33,19 @@ class BatchRandomDelay(BatchRandomDataAugmentation):
             self,
             sample_rate: int,
             volume_factor: float = 0.5,
-            min_delay: float = 200.,
-            max_delay: float = 500.,
+            min_delay: int = 200,
+            max_delay: int = 500,
+            delay_interval: int = 50,
             p: float = 0.5,
             return_masks: bool = False
     ):
         super(BatchRandomDelay, self).__init__(p=p, return_masks=return_masks)
         self.sample_rate = sample_rate
         self.volume_factor = volume_factor
+        self.delay_interval = delay_interval
 
-        self.sample_random_delays = self.uniform_sampling_fn(min_delay, max_delay)
+        self.sample_random_delays = self.randint_sampling_fn(min_delay // delay_interval,
+                                                             max_delay // delay_interval + 1)
 
     def _apply_augmentation(
             self,
@@ -54,7 +57,7 @@ class BatchRandomDelay(BatchRandomDataAugmentation):
         device = audio_waveforms.device
 
         if delays is None:
-            delays = self.sample_random_delays(batch_size, device=device)
+            delays = self.delay_interval * self.sample_random_delays(batch_size, device=device)
 
         offsets = self._calc_offset(delays)
         indices = torch.arange(num_samples, device=device).unsqueeze(0) - offsets.unsqueeze(1)

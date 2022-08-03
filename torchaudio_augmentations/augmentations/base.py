@@ -1,4 +1,5 @@
 import abc
+from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -10,11 +11,16 @@ class BatchRandomDataAugmentation(nn.Module):
         self.p = p
         self.return_masks = return_masks
 
-    def forward(self, x: torch.Tensor, **kwargs):
+    def forward(self, x: torch.Tensor, return_mask: Optional[bool] = None, **kwargs):
         mask = self._compute_mask(x.size(0), x.device)
         augmented_x = self._apply_augmentation(x, mask, **kwargs)
-        if self.return_masks:
+
+        if return_mask is None:
+            return_mask = self.return_masks
+
+        if return_mask:
             return augmented_x, mask
+
         return augmented_x
 
     @abc.abstractmethod
@@ -28,6 +34,12 @@ class BatchRandomDataAugmentation(nn.Module):
 
     def _compute_mask(self, length: int, device: torch.device) -> torch.BoolTensor:
         return torch.rand(length, device=device) < self.p
+
+    @staticmethod
+    def randint_sampling_fn(min_value, max_value):
+        def sample_randint(*size, **kwargs):
+            return torch.randint(min_value, max_value, size, **kwargs)
+        return sample_randint
 
     @staticmethod
     def uniform_sampling_fn(min_value, max_value):
