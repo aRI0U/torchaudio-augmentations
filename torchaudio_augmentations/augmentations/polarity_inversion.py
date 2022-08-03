@@ -11,7 +11,7 @@ class PolarityInversion(torch.nn.Module):
 
 
 class BatchRandomPolarityInversion(torch.nn.Module):
-    def __init__(self, p):
+    def __init__(self, p: float = 0.5):
         super(BatchRandomPolarityInversion, self).__init__()
         self.p = p
 

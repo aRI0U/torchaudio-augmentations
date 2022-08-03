@@ -99,7 +99,7 @@ def batch_phase_vocoder(
 
 
 class BatchRandomTimeStretch(nn.Module):
-    def __init__(self, p: float, r_min: float, r_max: float, n_fft: int, hop_length: Optional[int] = None):
+    def __init__(self, r_min: float, r_max: float, n_fft: int, hop_length: Optional[int] = None, p: float = 0.5):
         super(BatchRandomTimeStretch, self).__init__()
         self.p = p
         self.sample_random_rates = lambda length: torch.empty(length).uniform(r_min, r_max)
@@ -107,15 +107,14 @@ class BatchRandomTimeStretch(nn.Module):
         hop_length = hop_length if hop_length is not None else n_fft // 2
         n_freq = n_fft // 2 + 1
         self.register_buffer("phase_advance", torch.linspace(0, torch.pi * hop_length, n_freq).unsqueeze(1))
-        # self.register_buffer("phase_advance", torch.zeros(n_freq).unsqueeze(1))
 
     def forward(self, complex_specgrams: torch.Tensor, rates: Optional[torch.Tensor] = None):
         batch_size = len(complex_specgrams)
+        if rates is not None:
+            rates = self.sample_random_rates(batch_size)
         mask = torch.rand(batch_size, device=complex_specgrams.device) < self.p
-        rates = rates if rates is not None else self.sample_random_rates(batch_size)
-        rates[~mask] = 1
         return torch.where(
-            mask.unsqueeze(-1).unsqueeze(-1).expand_as(complex_specgrams),
+            mask.unsqueeze(-1).expand_as(complex_specgrams.view(batch_size, -1)).view_as(complex_specgrams),
             batch_phase_vocoder(complex_specgrams, rates, self.phase_advance),
             complex_specgrams
         ), mask
@@ -183,9 +182,5 @@ if __name__ == "__main__":
 
     sample_module = TimeStretch(n_freq=129)
     batch_module = BatchRandomTimeStretch(p=0.8, r_min=0.5, r_max=1.5, n_fft=256)
-
-    # a = make_tensor((129, 192), dtype=torch.float, device=torch.device("cpu")).pow(2)
-    # b = sample_module(a, 0.8)
-    # assert_allclose(a, b)
 
     test_batches_augmentations(sample_module, batch_module)
