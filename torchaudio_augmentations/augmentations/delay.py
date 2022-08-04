@@ -3,7 +3,7 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from base import BatchRandomDataAugmentation
+from .base import BatchRandomDataAugmentation
 
 
 class Delay(nn.Module):

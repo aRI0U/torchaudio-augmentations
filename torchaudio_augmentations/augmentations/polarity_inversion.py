@@ -1,4 +1,5 @@
 import torch
+from .base import BatchRandomDataAugmentation
 
 
 class PolarityInversion(torch.nn.Module):
@@ -10,27 +11,27 @@ class PolarityInversion(torch.nn.Module):
         return audio
 
 
-class BatchRandomPolarityInversion(torch.nn.Module):
-    def __init__(self, p: float = 0.5):
-        super(BatchRandomPolarityInversion, self).__init__()
-        self.p = p
-
-    def forward(self, audio):
+class BatchRandomPolarityInversion(BatchRandomDataAugmentation):
+    def _apply_augmentation(
+            self,
+            audio_waveforms: torch.Tensor,
+            mask: torch.BoolTensor
+    ) -> torch.Tensor:
         r"""
 
         Args:
-            audio (torch.Tensor): batch of audio samples, shape (batch_size, *)
+            audio_waveforms (torch.Tensor): batch of audio samples, shape (batch_size, ..., num_samples)
 
         Returns:
             torch.Tensor: batch of augmented audio, samples, same shape as `audio`
             torch.BoolTensor: mask indicating on which elements augmentations were applied,
                 shape (batch_size)
         """
-        batch_size = len(audio)
-        mask = torch.rand(batch_size, device=audio.device) < self.p
-        coeffs = torch.where(mask, -1, 1)
-        coeffs = coeffs.unsqueeze(1).expand_as(audio.view(batch_size, -1)).view_as(audio)
-        return coeffs * audio, mask
+        return torch.where(
+            self.expand_right(mask, audio_waveforms),
+            torch.neg(audio_waveforms),
+            audio_waveforms
+        )
 
 
 if __name__ == "__main__":

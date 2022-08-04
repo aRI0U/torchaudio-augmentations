@@ -3,7 +3,7 @@ from typing import Optional
 import torch
 from torchaudio.transforms import Vol
 
-from base import BatchRandomDataAugmentation
+from .base import BatchRandomDataAugmentation
 
 class Gain(torch.nn.Module):
     def forward(self, audio: torch.Tensor, gain: float) -> torch.Tensor:
