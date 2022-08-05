@@ -30,8 +30,8 @@ def batch_phase_vocoder(
         >>> complex_specgrams = torch.randn(2, freq, 300, dtype=torch.cfloat)
         >>> rate = 1.3 # Speed up by 30%
         >>> phase_advance = torch.linspace(
-        >>>    0, math.pi * hop_length, freq)[..., None]
-        >>> x = phase_vocoder(complex_specgrams, rate, phase_advance)
+        >>>    0, torch.pi * hop_length, freq)[..., None]
+        >>> x = batch_phase_vocoder(complex_specgrams, rate, phase_advance)
         >>> x.shape # with 231 == ceil(300 / 1.3)
         torch.Size([2, 1025, 231])
     """
