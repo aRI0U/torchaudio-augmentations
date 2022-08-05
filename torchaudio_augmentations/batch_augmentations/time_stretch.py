@@ -35,7 +35,10 @@ def batch_phase_vocoder(
         >>> x.shape # with 231 == ceil(300 / 1.3)
         torch.Size([2, 1025, 231])
     """
-    batch_size, num_freqs, num_timesteps = complex_specgrams.size()
+    # TODO: handle multi-channel spectrograms properly
+    batch_size = complex_specgrams.size(0)
+    num_freqs = complex_specgrams.size(-2)
+    num_timesteps = complex_specgrams.size(-1)
     device = complex_specgrams.device
 
     if isinstance(rate, float):
@@ -48,6 +51,8 @@ def batch_phase_vocoder(
     lengths = torch.ceil(num_timesteps / rate)
     if pad_mode == "same":
         lengths = lengths.clip(max=num_timesteps)
+    else:
+        raise NotImplementedError
 
     # Figures out the corresponding real dtype, i.e. complex128 -> float64, complex64 -> float32
     # Note torch.real is a view, so it does not incur any memory copy.

@@ -24,10 +24,10 @@ class BatchRandomNoise(BatchRandomDataAugmentation):
         noise_std = snr * audio_waveforms.std(dim=-1)
 
         # compute ratios corresponding to gain in dB
-        noise = noise_std.unsqueeze(-1) * torch.randn_like(audio_waveforms)
+        noise = self.expand_right(noise_std, audio_waveforms) * torch.randn_like(audio_waveforms)
 
         return torch.where(
-            mask.unsqueeze(-1).expand_as(audio_waveforms),
+            self.expand_right(mask, audio_waveforms),
             audio_waveforms + noise,
             audio_waveforms
         )

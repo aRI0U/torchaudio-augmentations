@@ -26,8 +26,8 @@ class BatchRandomGain(BatchRandomDataAugmentation):
         ratios = torch.full((batch_size,), 10, device=device).pow(gains_db / 20)
 
         return torch.where(
-            mask.unsqueeze(-1).expand_as(audio_waveforms),
-            audio_waveforms * ratios.unsqueeze(-1),
+            self.expand_right(mask, audio_waveforms),
+            self.expand_right(ratios, audio_waveforms) * audio_waveforms,
             audio_waveforms
         )
 

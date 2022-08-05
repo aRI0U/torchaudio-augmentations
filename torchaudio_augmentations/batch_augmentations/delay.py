@@ -30,7 +30,9 @@ class BatchRandomDelay(BatchRandomDataAugmentation):
             mask: torch.BoolTensor,
             delays: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
-        batch_size, num_samples = audio_waveforms.size()
+        # TODO: make it work for inputs with more than 2 dims, e.g. stereo signals
+        batch_size = audio_waveforms.size(0)
+        num_samples = audio_waveforms.size(-1)
         device = audio_waveforms.device
 
         if delays is None:
