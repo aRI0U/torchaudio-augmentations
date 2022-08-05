@@ -43,7 +43,7 @@ if __name__ == "__main__":
     import traceback
 
     import torch
-    from torch.testing import assert_allclose, make_tensor
+    from torch.testing import assert_allclose
 
 
     def test_batches_augmentations(module: torch.nn.Module, batch_module: torch.nn.Module, gpu=0):
