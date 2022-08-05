@@ -10,7 +10,7 @@ class BatchRandomNoise(BatchRandomDataAugmentation):
         super(BatchRandomNoise, self).__init__(p=p, return_masks=return_masks)
         self.sample_random_snr = self.uniform_sampling_fn(min_snr, max_snr)
 
-    def _apply_augmentation(
+    def apply_augmentation(
             self,
             audio_waveforms: torch.Tensor,
             mask: torch.BoolTensor,

@@ -24,7 +24,7 @@ class BatchRandomDelay(BatchRandomDataAugmentation):
         self.sample_random_delays = self.randint_sampling_fn(min_delay // delay_interval,
                                                              max_delay // delay_interval + 1)
 
-    def _apply_augmentation(
+    def apply_augmentation(
             self,
             audio_waveforms: torch.Tensor,
             mask: torch.BoolTensor,

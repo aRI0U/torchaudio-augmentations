@@ -10,7 +10,7 @@ class BatchRandomGain(BatchRandomDataAugmentation):
         super(BatchRandomGain, self).__init__(p=p, return_masks=return_masks)
         self.sample_random_gains = self.uniform_sampling_fn(min_gain_db, max_gain_db)
 
-    def _apply_augmentation(
+    def apply_augmentation(
             self,
             audio_waveforms: torch.Tensor,
             mask: torch.BoolTensor,
