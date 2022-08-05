@@ -1,4 +1,9 @@
+from typing import Optional, Sequence
+
 import torch
+import torch.nn as nn
+
+from torchaudio_augmentations.batch_augmentations.base import BatchRandomDataAugmentation
 
 
 class Compose:
@@ -40,3 +45,57 @@ class ComposeMany(Compose):
         for _ in range(self.num_augmented_samples):
             samples.append(self.transform(x).unsqueeze(dim=0).clone())
         return torch.cat(samples, dim=0)
+
+
+# TODO: add eventual final transform (log-spec, mel, etc.)
+class BatchAudioComposeTransforms(nn.Module):
+    def __init__(
+            self,
+            wave_transforms: Sequence[BatchRandomDataAugmentation] = None,
+            spec_transforms: Sequence[BatchRandomDataAugmentation] = None,
+            spectrogram_fn: Optional[nn.Module] = None
+    ):
+        super(BatchAudioComposeTransforms, self).__init__()
+        self.wave_transforms = nn.ModuleList(wave_transforms)
+        self.spec_transforms = nn.ModuleList(spec_transforms)
+
+        self.spectrogram = spectrogram_fn
+        if spectrogram_fn is None:
+            assert len(spec_transforms) == 0, \
+                "You try to apply transformations to a spectrogram but " \
+                "no method for changing the waveform into a spectrogram is defined"
+            self.spectrogram = nn.Identity()
+
+        # retrieve attributes from spectrogram since spec_transforms should be applied to complex spectrograms
+        self.power, self.spectrogram.power = self.spectrogram.power, None
+        self.normalized, self.spectrogram.normalized = self.spectrogram.normalized, False
+
+    def forward(self, x: torch.Tensor):
+        waveforms = x.clone()
+        masks = []
+
+        for transform in self.wave_transforms:
+            x, mask = transform(x)
+            masks.append(mask)
+
+        specgrams = self.spectrogram(waveforms)
+        x = self.spectrogram(x)
+
+        for transform in self.spec_transforms:
+            x, mask = transform(x)
+            masks.append(mask)
+
+        if self.power is not None:
+            specgrams = specgrams.abs().pow(self.power)
+            x = x.abs().pow(self.power)
+        if self.normalized:
+            specgrams = self.normalize(specgrams)
+            x = self.normalize(x)
+        return specgrams, x, torch.stack(masks, dim=1)
+
+    @staticmethod
+    def normalize(specgrams):
+        batch_size = specgrams.size(0)
+        flat_specgrams = specgrams.view(batch_size, -1)
+        max_values = flat_specgrams.max(dim=1, keepdim=True).clip(min=1e-12)
+        return specgrams / max_values.expand_as(flat_specgrams).view_as(specgrams)

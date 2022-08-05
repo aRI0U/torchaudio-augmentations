@@ -27,3 +27,4 @@ def test_batches_augmentations(module: torch.nn.Module, batch_module: torch.nn.M
 
         # compare results
         assert_allclose(augmented_samples, augmented_batch)
+        print(device, "OK")

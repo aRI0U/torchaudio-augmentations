@@ -62,3 +62,20 @@ class BatchRandomDataAugmentation(nn.Module):
         def sample_uniform(*size, **kwargs):
             return torch.empty(*size, **kwargs).uniform(min_value, max_value)
         return sample_uniform
+
+
+def BatchRandomApply(module):
+    class BatchRandomTransform(BatchRandomDataAugmentation):
+        def __init__(self, p: float = 0.5, return_masks: bool = False):
+            super(BatchRandomTransform, self).__init__(p=p, return_masks=return_masks)
+            self.module = module
+
+        def _apply_augmentation(
+                self,
+                x: torch.Tensor,
+                mask: torch.BoolTensor,
+                **kwargs
+        ) -> torch.Tensor:
+            return torch.where(self.expand_right(mask, x), self.module(x, **kwargs), x)
+
+    return BatchRandomTransform
