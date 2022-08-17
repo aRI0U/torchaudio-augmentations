@@ -20,7 +20,7 @@ class BatchRandomDataAugmentation(nn.Module):
         self.p = p
         self.return_masks = return_masks
 
-    def forward(self, x: torch.Tensor, return_mask: Optional[bool] = None, **kwargs):
+    def forward(self, x: torch.Tensor, **kwargs):
         r"""Apply the data augmentation to each sample of a batch with probability `p`
         and eventually return the mask indicating to which samples the augmentation
         has been applied on
@@ -28,8 +28,6 @@ class BatchRandomDataAugmentation(nn.Module):
         Args:
             x (torch.Tensor): batch of waveforms or spectrograms the augmentation
                 should be applied on
-            return_mask (Optional[bool]): whether to return the mask or not.
-                If provided, overrides `self.return_masks`.
             kwargs: Implementation-specific keyword-arguments that are directly passed
                 to the `apply_augmentation` method
 
@@ -39,6 +37,10 @@ class BatchRandomDataAugmentation(nn.Module):
         """
         mask = self._compute_mask(x.size(0), x.device)
         indices = torch.argwhere(mask)
+
+        if indices.size(0) == 0:
+            return x, mask if self.return_masks else x
+
         augmented_samples = self.apply_augmentation(x[mask], **kwargs)
         augmented_x = x.scatter(
             0,
@@ -46,10 +48,7 @@ class BatchRandomDataAugmentation(nn.Module):
             augmented_samples
         )
 
-        if return_mask is None:
-            return_mask = self.return_masks
-
-        if return_mask:
+        if self.return_masks:
             return augmented_x, mask
 
         return augmented_x

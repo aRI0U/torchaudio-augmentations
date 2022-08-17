@@ -115,6 +115,7 @@ class BatchRandomTimeStretch(BatchRandomDataAugmentation):
             return_masks: Optional[bool] = None
     ):
         super(BatchRandomTimeStretch, self).__init__(p=p, return_masks=return_masks)
+        self.sample_random_rates = self.uniform_sampling_fn(r_min, r_max)
 
         hop_length = hop_length if hop_length is not None else n_fft // 2
         n_freq = n_fft // 2 + 1
