@@ -96,7 +96,7 @@ def test_batches_augmentations(
 
 
 batch_size = 11
-gpu = 0
+gpu = 0 if torch.cuda.is_available() else None
 
 test_batches_augmentations(
     Delay(16000),
