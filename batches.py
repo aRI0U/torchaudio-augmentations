@@ -86,10 +86,10 @@ def test_batches_augmentations(
                     plt.show()
             else:
                 key, values = next(iter(kwargs.items()))
-                # for d, v in zip(diff, values):
-                #     plt.plot(d)
-                #     plt.title(f"{key} = {v.item():.1f}")
-                #     plt.show()
+                for d, v in zip(diff, values):
+                    plt.plot(d)
+                    plt.title(f"{key} = {v.item():.1f}")
+                    plt.show()
             return
         print(device, "OK.")
     print("Passed.\n")
@@ -128,7 +128,7 @@ test_batches_augmentations(
     TimeStretch(n_freq=129),
     BatchRandomTimeStretch(r_min=0.5, r_max=1.5, n_fft=256, p=1, return_masks=True),
     rates=sample_uniform(0.5, 1.5, (batch_size,)),
-    input_shape=(batch_size, 2, 129, 192),
-    dtype=torch.complex64,
+    input_shape=(batch_size, 129, 192),
+    dtype=torch.complex128,
     gpu=gpu
 )

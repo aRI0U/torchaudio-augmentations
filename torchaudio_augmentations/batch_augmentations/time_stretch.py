@@ -16,7 +16,7 @@ def batch_phase_vocoder(
 
     Args:
         complex_specgrams (Tensor):
-            A tensor of dimension `(batch_size, freq, num_frame)` with complex dtype.
+            A tensor of dimension `(batch_size, *, freq, num_frame)` with complex dtype.
         rate (torch.Tensor): Per-sample speed-up factor, shape (batch_size)
         phase_advance (Tensor): Expected phase advance in each bin. Dimension of `(freq, 1)`
 
@@ -52,14 +52,14 @@ def batch_phase_vocoder(
     # Figures out the corresponding real dtype, i.e. complex128 -> float64, complex64 -> float32
     # Note torch.real is a view, so it does not incur any memory copy.
     real_dtype = torch.real(complex_specgrams).dtype
-    indices = torch.arange(0, lengths.max(), device=device, dtype=real_dtype)
+    indices = torch.arange(0, num_timesteps, device=device, dtype=real_dtype)
     time_steps = indices.repeat(batch_size, 1) * rate.unsqueeze(-1)
+
+    time_steps = BatchRandomDataAugmentation.expand_mid(time_steps, complex_specgrams).contiguous()
 
     # mask invalid time steps
     invalid_time_steps = time_steps >= num_timesteps
-    time_steps[invalid_time_steps] = 0
-
-    time_steps = time_steps.unsqueeze(1)  # shape: (batch_size, 1, num_timesteps / min_rate)
+    time_steps.masked_fill_(invalid_time_steps, 0)
 
     alphas = time_steps % 1.0
     phase_0 = complex_specgrams[..., :1].angle()
@@ -70,7 +70,7 @@ def batch_phase_vocoder(
     # (new_bins, freq, 2)
     # complex_specgrams_0 = complex_specgrams.index_select(-1, time_steps.long())
     # complex_specgrams_1 = complex_specgrams.index_select(-1, (time_steps + 1).long())
-    time_steps = time_steps.long().expand(-1, num_freqs, -1)
+    time_steps = time_steps.long()
     complex_specgrams_0 = complex_specgrams.gather(-1, time_steps)
     complex_specgrams_1 = complex_specgrams.gather(-1, time_steps + 1)
 
@@ -92,8 +92,11 @@ def batch_phase_vocoder(
 
     complex_specgrams_stretch = torch.polar(mag, phase_acc)
 
-    invalid_time_steps = invalid_time_steps.unsqueeze(1).expand_as(complex_specgrams_stretch)
-    complex_specgrams_stretch[invalid_time_steps] = 0
+    complex_specgrams_stretch.masked_fill_(
+        invalid_time_steps,
+        # BatchRandomDataAugmentation.expand_mid(invalid_time_steps, complex_specgrams_stretch),
+        0
+    )
 
     return complex_specgrams_stretch
 
