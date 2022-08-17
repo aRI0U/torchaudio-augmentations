@@ -1,14 +1,13 @@
 from typing import Optional, Union
 
 import torch
-import torch.nn as nn
 
 from .base import BatchRandomDataAugmentation
 
 
 def batch_phase_vocoder(
         complex_specgrams: torch.Tensor,
-        rate: Union[float, torch.Tensor],
+        rate: torch.Tensor,
         phase_advance: torch.Tensor,
         pad_mode: Union[int,str] = "same"
 ) -> torch.Tensor:
@@ -42,12 +41,6 @@ def batch_phase_vocoder(
     num_freqs = complex_specgrams.size(-2)
     num_timesteps = complex_specgrams.size(-1)
     device = complex_specgrams.device
-
-    if isinstance(rate, float):
-        rate = torch.empty(batch_size, device=device).fill(rate)
-
-    if torch.allclose(rate, torch.ones(batch_size, device=device)):
-        return complex_specgrams
 
     # Figures out the corresponding real dtype, i.e. complex128 -> float64, complex64 -> float32
     # Note torch.real is a view, so it does not incur any memory copy.
@@ -109,7 +102,6 @@ class BatchRandomTimeStretch(BatchRandomDataAugmentation):
             return_masks: bool = False
     ):
         super(BatchRandomTimeStretch, self).__init__(p=p, return_masks=return_masks)
-        self.p = p
         self.sample_random_rates = self.uniform_sampling_fn(r_min, r_max)
 
         hop_length = hop_length if hop_length is not None else n_fft // 2
