@@ -86,6 +86,15 @@ class BatchRandomDataAugmentation(nn.Module):
         return to_expand.unsqueeze(-1).expand_as(target.view(batch_size, -1)).view_as(target)
 
     @staticmethod
+    def expand_mid(to_expand: torch.Tensor, target: torch.Tensor):
+        batch_size, num_samples = to_expand.size()
+        assert target.size(0) == batch_size, \
+            f"Both tensors must have the same batch size, got {to_expand.size()} and {target.size()}."
+        assert target.size(-1) == num_samples, \
+            f"Both tensors must have the same number of samples, got {to_expand.size()} and {target.size()}."
+        return to_expand.unsqueeze(1).expand_as(target.view(batch_size, -1, num_samples)).view_as(target)
+
+    @staticmethod
     def randint_sampling_fn(min_value, max_value):
         def sample_randint(*size, **kwargs):
             return torch.randint(min_value, max_value, size, **kwargs)
@@ -94,7 +103,9 @@ class BatchRandomDataAugmentation(nn.Module):
     @staticmethod
     def uniform_sampling_fn(min_value, max_value):
         def sample_uniform(*size, **kwargs):
-            return torch.empty(*size, **kwargs).uniform(min_value, max_value)
+            tensor = torch.empty(*size, **kwargs)
+            tensor.uniform_(min_value, max_value)
+            return tensor
         return sample_uniform
 
 

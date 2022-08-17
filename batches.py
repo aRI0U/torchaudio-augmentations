@@ -59,7 +59,7 @@ def test_batches_augmentations(
             # pass through batch_module
             augmented_batch, mask = batch_module(batch, **kwargs)
 
-            values = next(iter(kwargs.values()))
+            values = next(iter(kwargs.values()))[mask]
             samples_list = [module(sample, value.item()) if m else sample
                             for sample, value, m in zip(batch, values, mask)]
 
@@ -96,37 +96,37 @@ def test_batches_augmentations(
 
 
 batch_size = 11
-gpu = 0
+gpu = 0 if torch.cuda.is_available() else None
 
 test_batches_augmentations(
     Delay(16000),
-    BatchRandomDelay(16000, p=0.8, return_masks=True),
+    BatchRandomDelay(16000, p=1, return_masks=True),
     delays=sample_uniform(200, 500, (batch_size,)),
     gpu=gpu
 )
 
 test_batches_augmentations(
     Gain(),
-    BatchRandomGain(p=0.9, return_masks=True),
+    BatchRandomGain(p=1, return_masks=True),
     gains_db=sample_uniform(-6., 0., (batch_size,)),
     gpu=gpu
 )
 
 test_batches_augmentations(
     PolarityInversion(),
-    BatchRandomPolarityInversion(p=0.8, return_masks=True),
+    BatchRandomPolarityInversion(p=1, return_masks=True),
     gpu=gpu
 )
 
 test_batches_augmentations(
     Reverse(),
-    BatchRandomReverse(p=0.8, return_masks=True),
+    BatchRandomReverse(p=1, return_masks=True),
     gpu=gpu
 )
 
 test_batches_augmentations(
     TimeStretch(n_freq=129),
-    BatchRandomTimeStretch(r_min=0.5, r_max=1.5, n_fft=256, p=0.8, return_masks=True),
+    BatchRandomTimeStretch(r_min=0.5, r_max=1.5, n_fft=256, p=1, return_masks=True),
     rates=sample_uniform(0.5, 1.5, (batch_size,)),
     input_shape=(batch_size, 2, 129, 192),
     dtype=torch.complex64,

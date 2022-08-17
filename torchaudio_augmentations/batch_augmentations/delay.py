@@ -35,10 +35,10 @@ class BatchRandomDelay(BatchRandomDataAugmentation):
         offsets = self._calc_offset(delays)
         indices = torch.arange(num_samples, device=device).unsqueeze(0) - offsets.unsqueeze(1)
         invalid_indices = indices < 0
-        indices[invalid_indices] = 0
+        indices.masked_fill_(invalid_indices, 0)
 
-        delayed_signals = audio_waveforms.gather(-1, indices)
-        delayed_signals[invalid_indices] = 0
+        delayed_signals = audio_waveforms.gather(-1, self.expand_mid(indices, audio_waveforms))
+        delayed_signals.masked_fill_(self.expand_mid(invalid_indices, audio_waveforms), 0)
 
         return audio_waveforms + self.volume_factor * delayed_signals
 
