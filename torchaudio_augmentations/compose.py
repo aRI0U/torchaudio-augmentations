@@ -53,11 +53,20 @@ class BatchAudioComposeTransforms(nn.Module):
             self,
             wave_transforms: Sequence[BatchRandomDataAugmentation] = None,
             spec_transforms: Sequence[BatchRandomDataAugmentation] = None,
-            spectrogram_fn: Optional[nn.Module] = None
+            spectrogram_fn: Optional[nn.Module] = None,
+            p: float = 0.5,
+            return_masks: bool = False
     ):
         super(BatchAudioComposeTransforms, self).__init__()
+
         self.wave_transforms = nn.ModuleList(wave_transforms)
         self.spec_transforms = nn.ModuleList(spec_transforms)
+
+        for transform in self.wave_transforms + self.spec_transforms:
+            if transform.p is None:
+                transform.p = p
+            if transform.return_masks is None:
+                transform.return_masks = return_masks
 
         self.spectrogram = spectrogram_fn
         if spectrogram_fn is None:
@@ -75,15 +84,21 @@ class BatchAudioComposeTransforms(nn.Module):
         masks = []
 
         for transform in self.wave_transforms:
-            x, mask = transform(x)
-            masks.append(mask)
+            if transform.return_masks:
+                x, mask = transform(x)
+                masks.append(mask)
+            else:
+                x = transform(x)
 
         specgrams = self.spectrogram(waveforms)
         x = self.spectrogram(x)
 
         for transform in self.spec_transforms:
-            x, mask = transform(x)
-            masks.append(mask)
+            if transform.return_masks:
+                x, mask = transform(x)
+                masks.append(mask)
+            else:
+                x = transform(x)
 
         if self.power is not None:
             specgrams = specgrams.abs().pow(self.power)
@@ -91,7 +106,10 @@ class BatchAudioComposeTransforms(nn.Module):
         if self.normalized:
             specgrams = self.normalize(specgrams)
             x = self.normalize(x)
-        return specgrams, x, torch.stack(masks, dim=1)
+
+        if masks:
+            return specgrams, x, torch.stack(masks, dim=1)
+        return specgrams, x
 
     @staticmethod
     def normalize(specgrams):

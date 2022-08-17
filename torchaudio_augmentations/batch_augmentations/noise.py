@@ -21,7 +21,8 @@ class BatchRandomNoise(BatchRandomDataAugmentation):
 
         if snr is None:
             snr = self.sample_random_snr(batch_size, device=device)
-        noise_std = snr * audio_waveforms.std(dim=-1)
+
+        noise_std = snr * audio_waveforms.view(batch_size, -1).std(dim=-1)
 
         # compute ratios corresponding to gain in dB
         noise = self.expand_right(noise_std, audio_waveforms) * torch.randn_like(audio_waveforms)
@@ -80,8 +81,8 @@ if __name__ == "__main__":
         print("Passed.")
 
 
-    sample_module = Noise()
+    # sample_module = Noise()
     batch_module = BatchRandomNoise(p=0.8, return_masks=True)
 
-    test_batches_augmentations(sample_module, batch_module, gpu=5)
+    # test_batches_augmentations(sample_module, batch_module, gpu=5)
 
