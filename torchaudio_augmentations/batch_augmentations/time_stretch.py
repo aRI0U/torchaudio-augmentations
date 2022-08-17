@@ -7,7 +7,7 @@ from .base import BatchRandomDataAugmentation
 
 def batch_phase_vocoder(
         complex_specgrams: torch.Tensor,
-        rate: Union[float, torch.Tensor],
+        rate: torch.Tensor,
         phase_advance: torch.Tensor,
         pad_mode: Union[int,str] = "same"
 ) -> torch.Tensor:
@@ -41,12 +41,6 @@ def batch_phase_vocoder(
     num_freqs = complex_specgrams.size(-2)
     num_timesteps = complex_specgrams.size(-1)
     device = complex_specgrams.device
-
-    if isinstance(rate, float):
-        rate = torch.empty(batch_size, device=device).fill(rate)
-
-    if torch.allclose(rate, torch.ones(batch_size, device=device)):
-        return complex_specgrams
 
     # compute the actual length of each time-stretched sample
     lengths = torch.ceil(num_timesteps / rate)
