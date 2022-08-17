@@ -38,7 +38,13 @@ class BatchRandomDataAugmentation(nn.Module):
             torch.BoolTensor (eventually): mask indicating which samples have been augmented
         """
         mask = self._compute_mask(x.size(0), x.device)
-        augmented_x = self.apply_augmentation(x, mask, **kwargs)
+        indices = torch.argwhere(mask)
+        augmented_samples = self.apply_augmentation(x[mask], **kwargs)
+        augmented_x = x.scatter(
+            0,
+            indices.expand_as(augmented_samples.view(indices.size(0), -1)).view_as(augmented_samples),
+            augmented_samples
+        )
 
         if return_mask is None:
             return_mask = self.return_masks
@@ -49,17 +55,11 @@ class BatchRandomDataAugmentation(nn.Module):
         return augmented_x
 
     @abc.abstractmethod
-    def apply_augmentation(
-            self,
-            x: torch.Tensor,
-            mask: torch.BoolTensor,
-            **kwargs
-    ) -> torch.Tensor:
+    def apply_augmentation(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
         r"""Apply the data augmentation to the samples of the batch that should be modified according to the mask
 
         Args:
             x (torch.Tensor): input batch of waveforms or spectrograms, shape (batch_size, *)
-            mask (torch.BoolTensor): mask indicating which samples should be transformed, shape (batch_size)
             kwargs: Implementation-specific keyword-arguments
 
         Returns:
@@ -116,12 +116,7 @@ def BatchRandomApply(module: nn.Module):
             super(BatchRandomTransform, self).__init__(p=p, return_masks=return_masks)
             self.module = module
 
-        def apply_augmentation(
-                self,
-                x: torch.Tensor,
-                mask: torch.BoolTensor,
-                **kwargs
-        ) -> torch.Tensor:
-            return torch.where(self.expand_right(mask, x), self.module(x, **kwargs), x)
+        def apply_augmentation(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
+            return self.module(x)
 
     return BatchRandomTransform

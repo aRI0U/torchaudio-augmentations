@@ -1,7 +1,8 @@
 from typing import Optional, Union
 
 import torch
-import torch.nn as nn
+
+from .base import BatchRandomDataAugmentation
 
 
 def batch_phase_vocoder(
@@ -103,27 +104,28 @@ def batch_phase_vocoder(
     return complex_specgrams_stretch
 
 
-class BatchRandomTimeStretch(nn.Module):
-    def __init__(self, r_min: float, r_max: float, n_fft: int, hop_length: Optional[int] = None, p: float = 0.5):
-        super(BatchRandomTimeStretch, self).__init__()
-        self.p = p
-        self.sample_random_rates = lambda length: torch.empty(length).uniform(r_min, r_max)
+class BatchRandomTimeStretch(BatchRandomDataAugmentation):
+    def __init__(
+            self,
+            r_min: float,
+            r_max: float,
+            n_fft: int,
+            hop_length: Optional[int] = None,
+            p: float = 0.5,
+            return_masks: Optional[bool] = None
+    ):
+        super(BatchRandomTimeStretch, self).__init__(p=p, return_masks=return_masks)
 
         hop_length = hop_length if hop_length is not None else n_fft // 2
         n_freq = n_fft // 2 + 1
         self.register_buffer("phase_advance", torch.linspace(0, torch.pi * hop_length, n_freq).unsqueeze(1))
 
-    def forward(self, complex_specgrams: torch.Tensor, rates: Optional[torch.Tensor] = None):
+    def apply_augmentation(self, complex_specgrams: torch.Tensor, rates: Optional[torch.Tensor] = None) -> torch.Tensor:
         batch_size = len(complex_specgrams)
         if rates is not None:
             rates = self.sample_random_rates(batch_size)
-        mask = torch.rand(batch_size, device=complex_specgrams.device) < self.p
-        return torch.where(
-            mask.unsqueeze(-1).expand_as(complex_specgrams.view(batch_size, -1)).view_as(complex_specgrams),
-            batch_phase_vocoder(complex_specgrams, rates, self.phase_advance),
-            complex_specgrams
-        ), mask
 
+        return batch_phase_vocoder(complex_specgrams, rates, self.phase_advance)
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt

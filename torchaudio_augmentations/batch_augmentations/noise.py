@@ -10,12 +10,7 @@ class BatchRandomNoise(BatchRandomDataAugmentation):
         super(BatchRandomNoise, self).__init__(p=p, return_masks=return_masks)
         self.sample_random_snr = self.uniform_sampling_fn(min_snr, max_snr)
 
-    def apply_augmentation(
-            self,
-            audio_waveforms: torch.Tensor,
-            mask: torch.BoolTensor,
-            snr: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
+    def apply_augmentation(self, audio_waveforms: torch.Tensor, snr: Optional[torch.Tensor] = None) -> torch.Tensor:
         batch_size = audio_waveforms.size(0)
         device = audio_waveforms.device
 
@@ -26,11 +21,7 @@ class BatchRandomNoise(BatchRandomDataAugmentation):
         # compute ratios corresponding to gain in dB
         noise = self.expand_right(noise_std, audio_waveforms) * torch.randn_like(audio_waveforms)
 
-        return torch.where(
-            self.expand_right(mask, audio_waveforms),
-            audio_waveforms + noise,
-            audio_waveforms
-        )
+        return audio_waveforms + noise
 
 
 if __name__ == "__main__":
