@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import time
 import traceback
 
 import torch
@@ -50,14 +51,18 @@ def test_batches_augmentations(
             batch.clamp_(-1, 1)
 
         if kwargs == {}:
+            t0 = time.time()
             augmented_batch, mask = batch_module(batch)
+            t1 = time.time()
             samples_list = [module(sample) if m else sample for sample, m in zip(batch, mask)]
         else:  # TODO: handle values as **kwargs
             for k, v in kwargs.items():
                 kwargs[k] = v.to(device)
 
             # pass through batch_module
+            t0 = time.time()
             augmented_batch, mask = batch_module(batch, **kwargs)
+            t1 = time.time()
 
             values = next(iter(kwargs.values()))[mask]
             samples_list = [module(sample, value.item()) if m else sample
@@ -86,16 +91,22 @@ def test_batches_augmentations(
                     plt.show()
             else:
                 key, values = next(iter(kwargs.items()))
-                for d, v in zip(diff, values):
-                    plt.plot(d)
+                for i, v in enumerate(values):
+                    plt.subplot(1, 3, 1)
+                    plt.imshow(augmented_batch[i].abs(), cmap="inferno")
+                    plt.subplot(1, 3, 2)
+                    plt.imshow(augmented_samples[i].abs(), cmap="inferno")
+                    plt.subplot(1, 3, 3)
+                    plt.imshow(diff[i], cmap="inferno")
+                    plt.colorbar()
                     plt.title(f"{key} = {v.item():.1f}")
                     plt.show()
             return
-        print(device, "OK.")
+        print(device, f"OK ({t1 - t0:.3f}s).")
     print("Passed.\n")
 
 
-batch_size = 11
+batch_size = 3
 gpu = 0 if torch.cuda.is_available() else None
 
 test_batches_augmentations(
@@ -125,10 +136,10 @@ test_batches_augmentations(
 )
 
 test_batches_augmentations(
-    TimeStretch(n_freq=129),
-    BatchRandomTimeStretch(r_min=0.5, r_max=1.5, n_fft=256, p=1, return_masks=True),
+    TimeStretch(n_freq=33),
+    BatchRandomTimeStretch(r_min=0.5, r_max=1.5, n_fft=64, p=1, return_masks=True),
     rates=sample_uniform(0.5, 1.5, (batch_size,)),
-    input_shape=(batch_size, 129, 192),
-    dtype=torch.complex128,
+    input_shape=(batch_size, 33, 65),
+    dtype=torch.complex64,
     gpu=gpu
 )

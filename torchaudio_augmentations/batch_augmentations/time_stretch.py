@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Optional
 
 import torch
 
@@ -8,8 +8,7 @@ from .base import BatchRandomDataAugmentation
 def batch_phase_vocoder(
         complex_specgrams: torch.Tensor,
         rate: torch.Tensor,
-        phase_advance: torch.Tensor,
-        pad_mode: Union[int,str] = "same"
+        phase_advance: torch.Tensor
 ) -> torch.Tensor:
     r"""Given a STFT tensor, speed up in time without modifying pitch by a
     factor of ``rate``.
@@ -38,16 +37,8 @@ def batch_phase_vocoder(
     """
     # TODO: handle multi-channel spectrograms properly
     batch_size = complex_specgrams.size(0)
-    num_freqs = complex_specgrams.size(-2)
     num_timesteps = complex_specgrams.size(-1)
     device = complex_specgrams.device
-
-    # compute the actual length of each time-stretched sample
-    lengths = torch.ceil(num_timesteps / rate)
-    if pad_mode == "same":
-        lengths = lengths.clip(max=num_timesteps)
-    else:
-        raise NotImplementedError
 
     # Figures out the corresponding real dtype, i.e. complex128 -> float64, complex64 -> float32
     # Note torch.real is a view, so it does not incur any memory copy.
@@ -55,11 +46,14 @@ def batch_phase_vocoder(
     indices = torch.arange(0, num_timesteps, device=device, dtype=real_dtype)
     time_steps = indices.repeat(batch_size, 1) * rate.unsqueeze(-1)
 
-    time_steps = BatchRandomDataAugmentation.expand_mid(time_steps, complex_specgrams).contiguous()
-
     # mask invalid time steps
     invalid_time_steps = time_steps >= num_timesteps
     time_steps.masked_fill_(invalid_time_steps, 0)
+
+    time_steps = BatchRandomDataAugmentation.expand_mid(
+        time_steps,
+        complex_specgrams
+    )
 
     alphas = time_steps % 1.0
     phase_0 = complex_specgrams[..., :1].angle()
@@ -91,10 +85,8 @@ def batch_phase_vocoder(
     mag = alphas * norm_1 + (1 - alphas) * norm_0
 
     complex_specgrams_stretch = torch.polar(mag, phase_acc)
-
     complex_specgrams_stretch.masked_fill_(
-        invalid_time_steps,
-        # BatchRandomDataAugmentation.expand_mid(invalid_time_steps, complex_specgrams_stretch),
+        BatchRandomDataAugmentation.expand_mid(invalid_time_steps, complex_specgrams_stretch),
         0
     )
 
@@ -119,8 +111,8 @@ class BatchRandomTimeStretch(BatchRandomDataAugmentation):
         self.register_buffer("phase_advance", torch.linspace(0, torch.pi * hop_length, n_freq).unsqueeze(1))
 
     def apply_augmentation(self, complex_specgrams: torch.Tensor, rates: Optional[torch.Tensor] = None) -> torch.Tensor:
-        batch_size = len(complex_specgrams)
-        if rates is not None:
+        batch_size = complex_specgrams.size(0)
+        if rates is None:
             rates = self.sample_random_rates(batch_size)
 
         return batch_phase_vocoder(complex_specgrams, rates, self.phase_advance)
@@ -175,8 +167,13 @@ if __name__ == "__main__":
             except AssertionError:
                 traceback.print_exc()
                 diff = (augmented_batch - augmented_samples).abs()
-                for d, r in zip(diff, rates):
-                    plt.imshow(d, cmap="inferno")
+                for i, r in enumerate(rates):
+                    plt.subplot(1, 3, 1)
+                    plt.imshow(augmented_batch[i])
+                    plt.subplot(1, 3, 2)
+                    plt.imshow(augmented_samples[i])
+                    plt.subplot(1, 3, 3)
+                    plt.imshow(diff[i], cmap="inferno")
                     plt.title(f"rate = {r.item():.3f}")
                     plt.colorbar()
                     plt.show()
