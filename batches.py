@@ -108,7 +108,7 @@ def benchmark(batch_module, input_shape=(2, 48000), dtype=torch.float32, gpu=0):
     batch_sizes = [8, 16, 32, 64, 128, 256]
     probs = [0, 0.25, 0.5, 0.75, 1]
 
-    devices = ["cpu", "cuda"]
+    devices = ["cpu", f"cuda:{gpu:d}"]
 
     for d in devices:
         device = torch.device(d)
@@ -183,7 +183,7 @@ for module in module_list:
 
 benchmark(
     BatchRandomTimeStretch(r_min=0.5, r_max=1.5, n_fft=256, p=0.8, return_masks=True),
-    input_shape=(2, 129, 192),
+    input_shape=(1, 129, 192),
     dtype=torch.complex64,
     gpu=gpu
 )

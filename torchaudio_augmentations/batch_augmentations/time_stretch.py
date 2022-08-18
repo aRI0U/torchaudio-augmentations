@@ -115,10 +115,8 @@ class BatchRandomTimeStretch(BatchRandomDataAugmentation):
             mask: torch.BoolTensor,
             rates: Optional[torch.Tensor] = None
     ):
-        batch_size = len(complex_specgrams)
-
         if rates is None:
-            rates = self.sample_random_rates(batch_size, device=complex_specgrams.device)
+            rates = self.sample_random_rates(complex_specgrams.size(0), device=complex_specgrams.device)
 
         return torch.where(
             self.expand_right(mask, complex_specgrams),

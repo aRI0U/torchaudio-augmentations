@@ -126,6 +126,7 @@ def BatchRandomApply(module: nn.Module):
         def __init__(self, p: float = 0.5, return_masks: bool = False):
             super(BatchRandomTransform, self).__init__(p=p, return_masks=return_masks)
             self.module = module
+            self.__class__.__name__ = "BatchRandom" + module.__class__.__name__
 
         def apply_augmentation(
                 self,
