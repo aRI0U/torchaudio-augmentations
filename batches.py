@@ -1,5 +1,8 @@
 import matplotlib.pyplot as plt
+import numpy as np
+
 import time
+import timeit
 import traceback
 
 import torch
@@ -64,7 +67,7 @@ def test_batches_augmentations(
             augmented_batch, mask = batch_module(batch, **kwargs)
             t1 = time.time()
 
-            values = next(iter(kwargs.values()))[mask]
+            values = next(iter(kwargs.values()))
             samples_list = [module(sample, value.item()) if m else sample
                             for sample, value, m in zip(batch, values, mask)]
 
@@ -91,55 +94,98 @@ def test_batches_augmentations(
                     plt.show()
             else:
                 key, values = next(iter(kwargs.items()))
-                for i, v in enumerate(values):
-                    plt.subplot(1, 3, 1)
-                    plt.imshow(augmented_batch[i].abs(), cmap="inferno")
-                    plt.subplot(1, 3, 2)
-                    plt.imshow(augmented_samples[i].abs(), cmap="inferno")
-                    plt.subplot(1, 3, 3)
-                    plt.imshow(diff[i], cmap="inferno")
-                    plt.colorbar()
-                    plt.title(f"{key} = {v.item():.1f}")
-                    plt.show()
+                # for d, v in zip(diff, values):
+                #     plt.plot(d)
+                #     plt.title(f"{key} = {v.item():.1f}")
+                #     plt.show()
             return
         print(device, f"OK ({t1 - t0:.3f}s).")
     print("Passed.\n")
 
 
-batch_size = 3
-gpu = 0 if torch.cuda.is_available() else None
+def benchmark(batch_module, input_shape=(2, 48000), dtype=torch.float32, gpu=0):
+    print(batch_module.__class__.__name__)
+    batch_sizes = [8, 16, 32, 64]#, 128, 256]
+    probs = [0, 0.25, 0.5, 0.75, 1]
 
-test_batches_augmentations(
-    Delay(16000),
-    BatchRandomDelay(16000, p=1, return_masks=True),
-    delays=sample_uniform(200, 500, (batch_size,)),
-    gpu=gpu
-)
+    devices = ["cpu", f"cuda:{gpu}"]
 
-test_batches_augmentations(
-    Gain(),
-    BatchRandomGain(p=1, return_masks=True),
-    gains_db=sample_uniform(-6., 0., (batch_size,)),
-    gpu=gpu
-)
+    for d in devices:
+        device = torch.device(d)
+        print(device)
+        batch_module = batch_module.to(device)
+        results = np.zeros((len(batch_sizes), len(probs)))
 
-test_batches_augmentations(
-    PolarityInversion(),
-    BatchRandomPolarityInversion(p=1, return_masks=True),
-    gpu=gpu
-)
+        for i, batch_size in enumerate(batch_sizes):
+            for j, p in enumerate(probs):
+                print(f"batch size: {batch_size}\tp: {p:.02f}", end='\r')
+                try:
+                    x = torch.randn(batch_size, *input_shape, device=device, dtype=dtype)
+                    batch_module.p = p
+                    if not dtype.is_complex:
+                        x.clamp_(-1, 1)
+                    results[i, j] = timeit.timeit("batch_module(x)", number=10, globals=dict(x=x, batch_module=batch_module))
+                except ValueError:#RuntimeError:
+                    results[i, j] = np.inf
+                    del x
+                    continue
 
-test_batches_augmentations(
-    Reverse(),
-    BatchRandomReverse(p=1, return_masks=True),
-    gpu=gpu
-)
+        print(results)
+        np.save(batch_module.__class__.__name__ + '_' + str(device), results)
 
-test_batches_augmentations(
-    TimeStretch(n_freq=33),
-    BatchRandomTimeStretch(r_min=0.5, r_max=1.5, n_fft=64, p=1, return_masks=True),
-    rates=sample_uniform(0.5, 1.5, (batch_size,)),
-    input_shape=(batch_size, 33, 65),
+
+batch_size = 67
+gpu = 7 if torch.cuda.is_available() else None
+
+# test_batches_augmentations(
+#     Delay(16000),
+#     BatchRandomDelay(16000, p=0.8, return_masks=True),
+#     delays=sample_uniform(200, 500, (batch_size,)),
+#     gpu=gpu
+# )
+#
+# test_batches_augmentations(
+#     Gain(),
+#     BatchRandomGain(p=0.9, return_masks=True),
+#     gains_db=sample_uniform(-6., 0., (batch_size,)),
+#     gpu=gpu
+# )
+#
+# test_batches_augmentations(
+#     PolarityInversion(),
+#     BatchRandomPolarityInversion(p=0.8, return_masks=True),
+#     gpu=gpu
+# )
+#
+# test_batches_augmentations(
+#     Reverse(),
+#     BatchRandomReverse(p=0.8, return_masks=True),
+#     gpu=gpu
+# )
+#
+# test_batches_augmentations(
+#     TimeStretch(n_freq=129),
+#     BatchRandomTimeStretch(r_min=0.5, r_max=1.5, n_fft=256, p=0.8, return_masks=True),
+#     rates=sample_uniform(0.5, 1.5, (batch_size,)),
+#     input_shape=(batch_size, 2, 129, 192),
+#     dtype=torch.complex128,
+#     gpu=gpu
+# )
+
+module_list = [
+    BatchRandomDelay(16000, p=0.8, return_masks=True),
+    BatchRandomGain(p=0.9, return_masks=True),
+    BatchRandomPolarityInversion(p=0.8, return_masks=True),
+    BatchRandomReverse(p=0.8, return_masks=True)
+]
+
+for module in module_list:
+    benchmark(module, gpu=gpu)
+    print()
+
+benchmark(
+    BatchRandomTimeStretch(r_min=0.5, r_max=1.5, n_fft=256, p=0.8, return_masks=True),
+    input_shape=(1, 129, 192),
     dtype=torch.complex64,
     gpu=gpu
 )

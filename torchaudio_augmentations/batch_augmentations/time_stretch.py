@@ -111,9 +111,8 @@ class BatchRandomTimeStretch(BatchRandomDataAugmentation):
         self.register_buffer("phase_advance", torch.linspace(0, torch.pi * hop_length, n_freq).unsqueeze(1))
 
     def apply_augmentation(self, complex_specgrams: torch.Tensor, rates: Optional[torch.Tensor] = None) -> torch.Tensor:
-        batch_size = complex_specgrams.size(0)
         if rates is None:
-            rates = self.sample_random_rates(batch_size)
+            rates = self.sample_random_rates(complex_specgrams.size(0), device=complex_specgrams.device)
 
         return batch_phase_vocoder(complex_specgrams, rates, self.phase_advance)
 
