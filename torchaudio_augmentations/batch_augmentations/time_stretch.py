@@ -47,14 +47,12 @@ def batch_phase_vocoder(
     real_dtype = torch.real(complex_specgrams).dtype
     indices = torch.arange(0, num_timesteps, device=device, dtype=real_dtype)
     time_steps = indices.repeat(batch_size, 1) * rate.unsqueeze(-1)
-    time_steps = BatchRandomDataAugmentation.expand_mid(  # TODO: handle that padding shit when all rates above 1
-        time_steps,
-        complex_specgrams
-    ).contiguous()
 
     # mask invalid time steps
     invalid_time_steps = time_steps >= num_timesteps
     time_steps.masked_fill_(invalid_time_steps, 0)
+
+    time_steps = BatchRandomDataAugmentation.expand_mid(time_steps, complex_specgrams)
 
     alphas = time_steps % 1.0
     phase_0 = complex_specgrams[..., :1].angle()
@@ -86,7 +84,10 @@ def batch_phase_vocoder(
     mag = alphas * norm_1 + (1 - alphas) * norm_0
 
     complex_specgrams_stretch = torch.polar(mag, phase_acc)
-    complex_specgrams_stretch.masked_fill_(invalid_time_steps, 0)
+    complex_specgrams_stretch.masked_fill_(
+        BatchRandomDataAugmentation.expand_mid(invalid_time_steps, complex_specgrams_stretch),
+        0
+    )
 
     return complex_specgrams_stretch
 
