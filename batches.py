@@ -105,7 +105,7 @@ def test_batches_augmentations(
 
 def benchmark(batch_module, input_shape=(2, 48000), dtype=torch.float32, gpu=0):
     print(batch_module.__class__.__name__)
-    batch_sizes = [8, 16, 32, 64]#, 128, 256]
+    batch_sizes = [8, 16, 32, 64, 128, 256]
     probs = [0, 0.25, 0.5, 0.75, 1]
 
     devices = ["cpu", f"cuda:{gpu}"]
