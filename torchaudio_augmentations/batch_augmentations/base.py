@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 
 
-class BatchRandomDataAugmentation(nn.Module):
+class BaseBatchRandomDataAugmentation(nn.Module, metaclass=abc.ABCMeta):
     r"""Base class for data augmentations that should be randomly applied to
     elements of a batch. In order to create new data augmentations, override
     this class and implement `apply_augmentation`.
@@ -16,56 +16,9 @@ class BatchRandomDataAugmentation(nn.Module):
             augmentation has been applied must be returned
     """
     def __init__(self, p: float = 0.5, return_masks: bool = False):
-        super(BatchRandomDataAugmentation, self).__init__()
+        super(BaseBatchRandomDataAugmentation, self).__init__()
         self.p = p
         self.return_masks = return_masks
-
-    def forward(self, x: torch.Tensor, return_mask: Optional[bool] = None, **kwargs):
-        r"""Apply the data augmentation to each sample of a batch with probability `p`
-        and eventually return the mask indicating to which samples the augmentation
-        has been applied on
-
-        Args:
-            x (torch.Tensor): batch of waveforms or spectrograms the augmentation
-                should be applied on
-            return_mask (Optional[bool]): whether to return the mask or not.
-                If provided, overrides `self.return_masks`.
-            kwargs: Implementation-specific keyword-arguments that are directly passed
-                to the `apply_augmentation` method
-
-        Returns:
-            torch.Tensor: batch with some random elements augmented
-            torch.BoolTensor (eventually): mask indicating which samples have been augmented
-        """
-        mask = self._compute_mask(x.size(0), x.device)
-        augmented_x = self.apply_augmentation(x, mask, **kwargs)
-
-        if return_mask is None:
-            return_mask = self.return_masks
-
-        if return_mask:
-            return augmented_x, mask
-
-        return augmented_x
-
-    @abc.abstractmethod
-    def apply_augmentation(
-            self,
-            x: torch.Tensor,
-            mask: torch.BoolTensor,
-            **kwargs
-    ) -> torch.Tensor:
-        r"""Apply the data augmentation to the samples of the batch that should be modified according to the mask
-
-        Args:
-            x (torch.Tensor): input batch of waveforms or spectrograms, shape (batch_size, *)
-            mask (torch.BoolTensor): mask indicating which samples should be transformed, shape (batch_size)
-            kwargs: Implementation-specific keyword-arguments
-
-        Returns:
-            torch.Tensor: batch with randomly transformed samples according to mask
-        """
-        pass
 
     def _compute_mask(self, length: int, device: torch.device) -> torch.BoolTensor:
         return torch.rand(length, device=device) < self.p
@@ -108,6 +61,50 @@ class BatchRandomDataAugmentation(nn.Module):
             tensor.uniform_(min_value, max_value)
             return tensor
         return sample_uniform
+
+
+class BatchRandomDataAugmentation(BaseBatchRandomDataAugmentation):
+    def forward(self, x: torch.Tensor, **kwargs):
+        r"""Apply the data augmentation to each sample of a batch with probability `p`
+        and eventually return the mask indicating to which samples the augmentation
+        has been applied on
+
+        Args:
+            x (torch.Tensor): batch of waveforms or spectrograms the augmentation
+                should be applied on
+            kwargs: Implementation-specific keyword-arguments that are directly passed
+                to the `apply_augmentation` method
+
+        Returns:
+            torch.Tensor: batch with some random elements augmented
+            torch.BoolTensor (eventually): mask indicating which samples have been augmented
+        """
+        mask = self._compute_mask(x.size(0), x.device)
+        augmented_x = self.apply_augmentation(x, mask, **kwargs)
+
+        if self.return_masks:
+            return augmented_x, mask
+
+        return augmented_x
+
+    @abc.abstractmethod
+    def apply_augmentation(
+            self,
+            x: torch.Tensor,
+            mask: torch.BoolTensor,
+            **kwargs
+    ) -> torch.Tensor:
+        r"""Apply the data augmentation to the samples of the batch that should be modified according to the mask
+
+        Args:
+            x (torch.Tensor): input batch of waveforms or spectrograms, shape (batch_size, *)
+            mask (torch.BoolTensor): mask indicating which samples should be transformed, shape (batch_size)
+            kwargs: Implementation-specific keyword-arguments
+
+        Returns:
+            torch.Tensor: batch with randomly transformed samples according to mask
+        """
+        pass
 
 
 def BatchRandomApply(module: nn.Module):

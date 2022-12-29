@@ -10,3 +10,7 @@ from .augmentations.polarity_inversion import PolarityInversion
 from .augmentations.random_resized_crop import RandomResizedCrop
 # from .augmentations.reverb import Reverb
 from .augmentations.reverse import Reverse
+
+# batch augmentations
+from .imports import BatchRandomDelay, BatchRandomGain, BatchRandomNoise, \
+    BatchRandomPolarityInversion, BatchRandomReverse, BatchRandomTimeStretch

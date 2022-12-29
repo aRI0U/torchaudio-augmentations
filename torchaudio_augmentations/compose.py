@@ -1,9 +1,9 @@
-from typing import Optional, Sequence
+from typing import Callable, Optional, Sequence, Union
 
 import torch
 import torch.nn as nn
 
-from torchaudio_augmentations.batch_augmentations.base import BatchRandomDataAugmentation
+from torchaudio_augmentations.batch_augmentations.base import BaseBatchRandomDataAugmentation
 
 
 class Compose:
@@ -51,8 +51,8 @@ class ComposeMany(Compose):
 class BatchAudioComposeTransforms(nn.Module):
     def __init__(
             self,
-            wave_transforms: Sequence[BatchRandomDataAugmentation] = None,
-            spec_transforms: Sequence[BatchRandomDataAugmentation] = None,
+            wave_transforms: Sequence[BaseBatchRandomDataAugmentation] = None,
+            spec_transforms: Sequence[BaseBatchRandomDataAugmentation] = None,
             spectrogram_fn: Optional[nn.Module] = None,
             p: float = 0.5,
             return_masks: bool = False

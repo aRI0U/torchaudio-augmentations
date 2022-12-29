@@ -3,22 +3,10 @@ import abc
 import torch
 import torch.nn as nn
 
+from torchaudio_augmentations.batch_augmentations.base import BaseBatchRandomDataAugmentation
 
-class BatchRandomDataAugmentation(nn.Module):
-    r"""Base class for data augmentations that should be randomly applied to
-    elements of a batch. In order to create new data augmentations, override
-    this class and implement `apply_augmentation`.
 
-    Args:
-        p (float): probability to apply the augmentation to a sample
-        return_masks (bool): whether masks indicating to which samples the
-            augmentation has been applied must be returned
-    """
-    def __init__(self, p: float = 0.5, return_masks: bool = False):
-        super(BatchRandomDataAugmentation, self).__init__()
-        self.p = p
-        self.return_masks = return_masks
-
+class BatchRandomDataAugmentation(BaseBatchRandomDataAugmentation):
     def forward(self, x: torch.Tensor, **kwargs):
         r"""Apply the data augmentation to each sample of a batch with probability `p`
         and eventually return the mask indicating to which samples the augmentation
@@ -38,7 +26,9 @@ class BatchRandomDataAugmentation(nn.Module):
         indices = torch.argwhere(mask)
 
         if indices.size(0) == 0:
-            return x, mask if self.return_masks else x
+            if self.return_masks:
+                return x, mask
+            return x
 
         augmented_samples = self.apply_augmentation(x[mask], **kwargs)
         augmented_x = x.scatter(
@@ -64,48 +54,6 @@ class BatchRandomDataAugmentation(nn.Module):
             torch.Tensor: batch with randomly transformed samples according to mask
         """
         pass
-
-    def _compute_mask(self, length: int, device: torch.device) -> torch.BoolTensor:
-        return torch.rand(length, device=device) < self.p
-
-    @staticmethod
-    def expand_right(to_expand: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-        r"""Expand a tensor so that it has the same shape has a given target
-
-        Args:
-            to_expand (torch.Tensor): tensor to expand, shape (B)
-            target (torch.Tensor): target tensor, shape (B, *)
-
-        Returns:
-            torch.Tensor: expanded tensor, same shape as `target`
-        """
-        batch_size = to_expand.size(0)
-        assert target.size(0) == batch_size, \
-            f"Both tensors must have the same batch size, got {to_expand.size()} and {target.size()}."
-        return to_expand.unsqueeze(-1).expand_as(target.view(batch_size, -1)).view_as(target)
-
-    @staticmethod
-    def expand_mid(to_expand: torch.Tensor, target: torch.Tensor):
-        batch_size, num_samples = to_expand.size()
-        assert target.size(0) == batch_size, \
-            f"Both tensors must have the same batch size, got {to_expand.size()} and {target.size()}."
-        assert target.size(-1) == num_samples, \
-            f"Both tensors must have the same number of samples, got {to_expand.size()} and {target.size()}."
-        return to_expand.unsqueeze(1).expand_as(target.view(batch_size, -1, num_samples)).view_as(target)
-
-    @staticmethod
-    def randint_sampling_fn(min_value, max_value):
-        def sample_randint(*size, **kwargs):
-            return torch.randint(min_value, max_value, size, **kwargs)
-        return sample_randint
-
-    @staticmethod
-    def uniform_sampling_fn(min_value, max_value):
-        def sample_uniform(*size, **kwargs):
-            tensor = torch.empty(*size, **kwargs)
-            tensor.uniform_(min_value, max_value)
-            return tensor
-        return sample_uniform
 
 
 def BatchRandomApply(module: nn.Module):

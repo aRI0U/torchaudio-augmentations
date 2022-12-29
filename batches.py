@@ -1,9 +1,10 @@
-import matplotlib.pyplot as plt
-import numpy as np
-
+from functools import partial
 import time
 import timeit
 import traceback
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 import torch
 import torch.nn.functional as F
@@ -15,11 +16,8 @@ from torchaudio_augmentations.augmentations.polarity_inversion import PolarityIn
 from torchaudio_augmentations.augmentations.reverse import Reverse
 from torchaudio.transforms import TimeStretch
 
-from torchaudio_augmentations.batch_augmentations.delay import BatchRandomDelay
-from torchaudio_augmentations.batch_augmentations.gain import BatchRandomGain
-from torchaudio_augmentations.batch_augmentations.misc import BatchRandomPolarityInversion, BatchRandomReverse
-from torchaudio_augmentations.batch_augmentations.time_stretch import BatchRandomTimeStretch
-
+from torchaudio_augmentations import BatchRandomDelay, BatchRandomGain, \
+    BatchRandomPolarityInversion, BatchRandomReverse, BatchRandomTimeStretch
 
 def sample_uniform(min_value, max_value, size, **kwargs):
     tensor = torch.empty(*size, **kwargs)
@@ -103,33 +101,29 @@ def test_batches_augmentations(
     print("Passed.\n")
 
 
-def benchmark(batch_module, input_shape=(2, 48000), dtype=torch.float32, gpu=0):
+def benchmark(batch_module, input_shape=(2, 48000), dtype=torch.float32, device=None):
     print(batch_module.__class__.__name__)
+    print(f"device: {device}\tlazy: {lazy}")
     batch_sizes = [8, 16, 32, 64, 128, 256]
     probs = [0, 0.25, 0.5, 0.75, 1]
 
-    devices = ["cpu", f"cuda:{gpu:d}"]
+    batch_module = batch_module.to(device)
 
-    for d in devices:
-        device = torch.device(d)
-        batch_module = batch_module.to(device)
+    results = np.zeros((len(batch_sizes), len(probs)))
 
-        results = np.zeros((len(batch_sizes), len(probs)))
+    for i, batch_size in enumerate(batch_sizes):
+        for j, p in enumerate(probs):
+            print(f"batch size: {batch_size}\tp: {p:.02f}", end='\r')
+            x = torch.randn(batch_size, *input_shape, device=device, dtype=dtype)
+            batch_module.p = p
+            if not dtype.is_complex:
+                x.clamp_(-1, 1)
+            try:
+                results[i, j] = timeit.timeit("batch_module(x)", number=100, globals=dict(x=x, batch_module=batch_module)) / 100
+            except RuntimeError:
+                results[i, j] = np.inf
 
-        for i, batch_size in enumerate(batch_sizes):
-            for j, p in enumerate(probs):
-                print(f"batch size: {batch_size}\tp: {p:.02f}", end='\r')
-                x = torch.randn(batch_size, *input_shape, device=device, dtype=dtype)
-                batch_module.p = p
-                if not dtype.is_complex:
-                    x.clamp_(-1, 1)
-                try:
-                    results[i, j] = timeit.timeit("batch_module(x)", number=10, globals=dict(x=x, batch_module=batch_module))
-                except RuntimeError:
-                    results[i, j] = np.inf
-
-        print(results)
-        np.save(batch_module.__class__.__name__ + '_' + str(device), results)
+    return results
 
 
 batch_size = 67
@@ -171,19 +165,36 @@ gpu = 7 if torch.cuda.is_available() else None
 # )
 
 module_list = [
-    BatchRandomDelay(16000, p=0.8, return_masks=True),
-    BatchRandomGain(p=0.9, return_masks=True),
-    BatchRandomPolarityInversion(p=0.8, return_masks=True),
-    BatchRandomReverse(p=0.8, return_masks=True)
+    partial(BatchRandomDelay, 16000, p=0.8, return_masks=True),
+    partial(BatchRandomGain, p=0.9, return_masks=True),
+    partial(BatchRandomPolarityInversion, p=0.8, return_masks=True),
+    partial(BatchRandomReverse, p=0.8, return_masks=True)
 ]
 
-for module in module_list:
-    benchmark(module, gpu=gpu)
-    print()
+for d in ["cpu", "cuda"]:
+    device = torch.device(d)
+    for lazy in [True, False]:
+        for m in module_list:
+            module = m(lazy=lazy)
+            arr = benchmark(module, device=device)
+            np.save(f"time/{'lazy' if lazy else 'normal'}/{module.__class__.__name__}_{device}", arr)
+            print(f"    mean: {arr.mean():.3f}"
+                  f"    std: {arr.std():.3f}"
+                  f"    min: {arr.min():.3f}"
+                  f"    max: {arr.max():.3f}"
+            )
+            print("                           ")
 
-benchmark(
-    BatchRandomTimeStretch(r_min=0.5, r_max=1.5, n_fft=256, p=0.8, return_masks=True),
-    input_shape=(1, 129, 192),
-    dtype=torch.complex64,
-    gpu=gpu
-)
+        arr = benchmark(
+            BatchRandomTimeStretch(r_min=0.5, r_max=1.5, n_fft=256, p=0.8, return_masks=True, lazy=lazy),
+            input_shape=(1, 129, 192),
+            dtype=torch.complex64,
+            device=device
+        )
+        np.save(f"time/{'lazy' if lazy else 'normal'}/BatchRandomTimeStretch_{device}", arr)
+        print(f"    mean: {arr.mean():.3f}"
+              f"    std: {arr.std():.3f}"
+              f"    min: {arr.min():.3f}"
+              f"    max: {arr.max():.3f}"
+        )
+        print("                           ")
