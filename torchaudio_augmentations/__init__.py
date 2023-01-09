@@ -13,4 +13,4 @@ from .augmentations.reverse import Reverse
 
 # batch augmentations
 from .imports import BatchRandomDelay, BatchRandomGain, BatchRandomNoise, \
-    BatchRandomPolarityInversion, BatchRandomReverse, BatchRandomTimeStretch
+    BatchRandomPitchShift, BatchRandomPolarityInversion, BatchRandomReverse, BatchRandomTimeStretch

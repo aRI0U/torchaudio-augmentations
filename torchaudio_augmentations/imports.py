@@ -18,6 +18,7 @@ class import_batch_random_data_augmentation(BaseBatchRandomDataAugmentation):
 BatchRandomDelay = import_batch_random_data_augmentation("BatchRandomDelay", "delay")
 BatchRandomGain = import_batch_random_data_augmentation("BatchRandomGain", "gain")
 BatchRandomNoise = import_batch_random_data_augmentation("BatchRandomNoise", "noise")
+BatchRandomPitchShift = import_batch_random_data_augmentation("BatchRandomPitchShift", "pitch_shift")
 BatchRandomTimeStretch = import_batch_random_data_augmentation("BatchRandomTimeStretch", "time_stretch")
 BatchRandomPolarityInversion = import_batch_random_data_augmentation("BatchRandomPolarityInversion", "misc")
 BatchRandomReverse = import_batch_random_data_augmentation("BatchRandomReverse", "misc")

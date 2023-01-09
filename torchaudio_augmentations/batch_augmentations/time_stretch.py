@@ -40,7 +40,7 @@ class BatchRandomTimeStretch(BatchRandomDataAugmentation):
 
         return torch.where(
             self.expand_right(mask, complex_specgrams),
-            phase_vocoder(complex_specgrams, rates, self.phase_advance)[..., :num_samples],
+            phase_vocoder(complex_specgrams, rates, self.phase_advance, pad_length=num_samples),
             complex_specgrams
         )
 

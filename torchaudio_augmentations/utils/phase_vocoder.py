@@ -1,6 +1,8 @@
-from typing import Union
+from typing import Optional
 
 import torch
+
+from torchaudio_augmentations.utils.sequences import pad_or_trim
 
 
 def expand_mid(to_expand: torch.Tensor, target: torch.Tensor):
@@ -100,7 +102,8 @@ def phase_vocoder_v1(
 def phase_vocoder(
         complex_specgrams: torch.Tensor,
         rate: torch.Tensor,
-        phase_advance: torch.Tensor
+        phase_advance: torch.Tensor,
+        pad_length: Optional[int] = None
 ) -> torch.Tensor:
     r"""Given a STFT tensor, speed up in time without modifying pitch by a
     factor of ``rate``.
@@ -110,6 +113,8 @@ def phase_vocoder(
             A tensor of dimension `(batch_size, *, freq, num_frame)` with complex dtype.
         rate (torch.Tensor): Per-sample speed-up factor, shape (batch_size)
         phase_advance (Tensor): Expected phase advance in each bin. Dimension of `(freq, 1)`
+        pad_length (int): Length to eventually pad or trim the signal, left unchanged if `None` is given.
+            Default: `None`
 
     Returns:
         Tensor:
@@ -183,6 +188,8 @@ def phase_vocoder(
         0
     )
 
+    if pad_length is not None:
+        return pad_or_trim(complex_specgrams_stretch, length=pad_length)
     return complex_specgrams_stretch
 
 

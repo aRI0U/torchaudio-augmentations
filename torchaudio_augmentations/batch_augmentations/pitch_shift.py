@@ -18,8 +18,8 @@ class BatchRandomPitchShift(BatchRandomDataAugmentation):
             win_length: Optional[int] = None,
             window: Optional[Callable] = None,
             bins_per_octave: int = 12,
-            p: float = 0.5,
-            return_masks: bool = False
+            p: Optional[float] = None,
+            return_masks: Optional[bool] = None
     ):
         super(BatchRandomPitchShift, self).__init__(p=p, return_masks=return_masks)
         self.sample_random_steps = self.randint_sampling_fn(min_steps, max_steps)
@@ -50,19 +50,40 @@ class BatchRandomPitchShift(BatchRandomDataAugmentation):
         if n_steps is None:
             n_steps = self.sample_random_steps(audio_waveforms.size(0), device=audio_waveforms.device)
 
-        num_samples = audio_waveforms.size(-1)
-
         return torch.where(
             self.expand_right(mask, audio_waveforms),
-            self.pitch_shift(audio_waveforms, n_steps)[..., :num_samples],
+            self.pitch_shift(audio_waveforms, n_steps),
             audio_waveforms
         )
 
     def pitch_shift(self, waveforms: torch.Tensor, n_steps: torch.LongTensor) -> torch.Tensor:
+        r"""Performs batch-wise pitch-shift
+
+        Args:
+            waveforms (torch.Tensor): batch of audio waveforms, shape (batch_size, *, num_samples)
+            n_steps (torch.LongTensor): number of steps to pitch-shift for each sample, shape (batch_size)
+
+        Returns:
+            torch.Tensor: batch of pitch-shifted tensors, same shape as `waveforms`
+        """
+        original_shape = waveforms.size()
+
         # pack batch
         waveforms = waveforms.reshape(-1, waveforms.size(-1))
+        n_steps = n_steps.repeat_interleave(waveforms.size(0) // n_steps.size(0))
 
+        # time-stretch in Fourier domain
         rates = 2.0 ** (-n_steps.float().div(self.bins_per_octave))
+
+        wave_stretch = self._stretch_waveform(waveforms, rates)
+        # print(wave_stretch.size(), original_shape[-1] / rates)
+        # resample time-stretched waveforms
+        sample_rate = torch.full_like(n_steps, self.sample_rate)
+        wave_shift = resample(wave_stretch, (sample_rate / rates).long(), sample_rate)
+        # print(wave_shift.size())
+        return wave_shift[..., :waveforms.size(-1)].view(original_shape)
+
+    def _stretch_waveform(self, waveforms: torch.Tensor, rates: torch.Tensor) -> torch.Tensor:
         specgrams = torch.stft(
             waveforms,
             n_fft=self.n_fft,
@@ -75,16 +96,13 @@ class BatchRandomPitchShift(BatchRandomDataAugmentation):
             return_complex=True
         )
         spec_stretch = phase_vocoder(specgrams, rates, self.phase_advance)
-        wave_stretch = torch.istft(
+        return torch.istft(
             spec_stretch,
             n_fft=self.n_fft,
             hop_length=self.hop_length,
             win_length=self.win_length,
-            window=self.window
+            window=self.window  # WARNING: len_stretch not defined
         )
-        sample_rate = torch.full_like(n_steps, self.sample_rate)
-        wave_shift = resample(wave_stretch, (sample_rate / rates).long(), sample_rate)
-        return wave_shift
 
 
 if __name__ == "__main__":
@@ -107,4 +125,3 @@ if __name__ == "__main__":
     shifted = ps(waveform, n_steps=steps)
     t2 = time.time()
     print(t2 - t1)
-

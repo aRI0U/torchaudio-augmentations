@@ -63,10 +63,12 @@ class BatchAudioComposeTransforms(nn.Module):
         self.spec_transforms = nn.ModuleList(spec_transforms)
 
         for transform in self.wave_transforms + self.spec_transforms:
-            if transform.p is None:
-                transform.p = p
-            if transform.return_masks is None:
-                transform.return_masks = return_masks
+            transform.p = p
+            transform.return_masks = return_masks
+            # if transform.p is None:
+            #     transform.p = p
+            # if transform.return_masks is None:
+            #     transform.return_masks = return_masks
 
         self.spectrogram = spectrogram_fn
         if spectrogram_fn is None:
