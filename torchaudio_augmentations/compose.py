@@ -55,40 +55,46 @@ class BatchAudioComposeTransforms(nn.Module):
             spec_transforms: Sequence[BaseBatchRandomDataAugmentation] = None,
             spectrogram_fn: Optional[nn.Module] = None,
             p: float = 0.5,
-            return_masks: bool = False
+            return_masks: bool = False,
+            return_params: bool = False
     ):
         super(BatchAudioComposeTransforms, self).__init__()
 
         self.wave_transforms = nn.ModuleList(wave_transforms)
         self.spec_transforms = nn.ModuleList(spec_transforms)
 
-        for transform in self.wave_transforms + self.spec_transforms:
-            transform.p = p
-            transform.return_masks = return_masks
-            # if transform.p is None:
-            #     transform.p = p
-            # if transform.return_masks is None:
-            #     transform.return_masks = return_masks
+        self._cache_wave_transforms = None
+        self._cache_spec_transforms = None
+
+        for transform in self.wave_transforms + self.spec_transforms:  # set transforms parameters if not provided
+            transform.p = transform.p or p
+            if transform.return_masks is None:
+                transform.return_masks = return_masks
+            if transform.return_params is None:
+                transform.return_params = return_params
 
         self.spectrogram = spectrogram_fn
+        self.power = None
+        self.normalized = False
+
         if spectrogram_fn is None:
-            assert len(spec_transforms) == 0, \
+            assert len(self.spec_transforms) == 0, \
                 "You try to apply transformations to a spectrogram but " \
                 "no method for changing the waveform into a spectrogram is defined"
             self.spectrogram = nn.Identity()
-
-        # retrieve attributes from spectrogram since spec_transforms should be applied to complex spectrograms
-        self.power, self.spectrogram.power = self.spectrogram.power, None
-        self.normalized, self.spectrogram.normalized = self.spectrogram.normalized, False
+        elif len(self.spec_transforms) > 0:
+            # retrieve attributes from spectrogram since spec_transforms should be applied to complex spectrograms
+            self.power, self.spectrogram.power = self.spectrogram.power, None
+            self.normalized, self.spectrogram.normalized = self.spectrogram.normalized, False
 
     def forward(self, x: torch.Tensor):
         waveforms = x.clone()
         masks = []
 
         for transform in self.wave_transforms:
-            if transform.return_masks:
-                x, mask = transform(x)
-                masks.append(mask)
+            if transform.return_masks or transform.return_params:
+                x, mask_or_params = transform(x)
+                masks.append(mask_or_params)
             else:
                 x = transform(x)
 
@@ -96,9 +102,9 @@ class BatchAudioComposeTransforms(nn.Module):
         x = self.spectrogram(x)
 
         for transform in self.spec_transforms:
-            if transform.return_masks:
-                x, mask = transform(x)
-                masks.append(mask)
+            if transform.return_masks or transform.return_params:
+                x, mask_or_params = transform(x)
+                masks.append(mask_or_params)
             else:
                 x = transform(x)
 
@@ -119,3 +125,8 @@ class BatchAudioComposeTransforms(nn.Module):
         flat_specgrams = specgrams.view(batch_size, -1)
         max_values = flat_specgrams.max(dim=1, keepdim=True).clip(min=1e-12)
         return specgrams / max_values.expand_as(flat_specgrams).view_as(specgrams)
+
+    def disable_augmentations(self):
+        self._cache_wave_transforms, self.wave_transforms = self.wave_transforms, nn.ModuleList()
+        self._cache_spec_transforms, self.spec_transforms = self.spec_transforms, nn.ModuleList()
+

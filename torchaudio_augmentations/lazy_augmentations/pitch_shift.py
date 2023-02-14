@@ -3,8 +3,7 @@ from typing import Callable, Optional, Tuple
 import torch
 
 from torchaudio_augmentations.utils import pad_or_trim, phase_vocoder, resample
-# from .base import BatchRandomDataAugmentation
-from torchaudio_augmentations.batch_augmentations.base import BatchRandomDataAugmentation
+from .base import BatchRandomDataAugmentation
 
 
 class BatchRandomPitchShift(BatchRandomDataAugmentation):
@@ -24,9 +23,10 @@ class BatchRandomPitchShift(BatchRandomDataAugmentation):
             minimal_gcd: int = 1,
             resampling_dtype: torch.dtype = torch.float32,
             p: Optional[float] = None,
+            return_params: Optional[bool] = None,
             return_masks: Optional[bool] = None
     ):
-        super(BatchRandomPitchShift, self).__init__(p=p, return_masks=return_masks)
+        super(BatchRandomPitchShift, self).__init__(p=p, return_params=return_params, return_masks=return_masks)
         self.sample_random_steps = self.randint_sampling_fn(min_steps, max_steps)
 
         self.sample_rate = sample_rate
@@ -56,17 +56,12 @@ class BatchRandomPitchShift(BatchRandomDataAugmentation):
     def apply_augmentation(
             self,
             audio_waveforms: torch.Tensor,
-            mask: torch.BoolTensor,
             n_steps: Optional[torch.LongTensor] = None
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         if n_steps is None:
             n_steps = self.sample_random_steps(audio_waveforms.size(0), device=audio_waveforms.device)
 
-        return torch.where(
-            self.expand_right(mask, audio_waveforms),
-            self.pitch_shift(audio_waveforms, n_steps),
-            audio_waveforms
-        ), 2 ** (n_steps / self.bins_per_octave)
+        return self.pitch_shift(audio_waveforms, n_steps), 2 ** (n_steps / self.bins_per_octave)
 
     def pitch_shift(self, waveforms: torch.Tensor, n_steps: torch.LongTensor) -> torch.Tensor:
         r"""Performs batch-wise pitch-shift
@@ -88,7 +83,7 @@ class BatchRandomPitchShift(BatchRandomDataAugmentation):
         rates = 2.0 ** (-n_steps.float().div(self.bins_per_octave))
 
         wave_stretch = self._stretch_waveform(waveforms, rates)
-
+        # print(wave_stretch.size(), original_shape[-1] / rates)
         # resample time-stretched waveforms
         sample_rate = torch.full_like(n_steps, self.sample_rate)
         wave_shift = resample(
@@ -99,7 +94,7 @@ class BatchRandomPitchShift(BatchRandomDataAugmentation):
             **self.resampling_kwargs
         )
         # print(wave_shift.size())
-        return pad_or_trim(wave_shift, waveforms.size(-1)).view(original_shape)
+        return pad_or_trim(wave_shift, waveforms.size(-1)).reshape(original_shape)
 
     def _stretch_waveform(self, waveforms: torch.Tensor, rates: torch.Tensor) -> torch.Tensor:
         specgrams = torch.stft(
@@ -121,25 +116,3 @@ class BatchRandomPitchShift(BatchRandomDataAugmentation):
             win_length=self.win_length,
             window=self.window  # WARNING: len_stretch not defined
         )
-
-
-if __name__ == "__main__":
-    import time
-    import torchaudio
-
-    wave1, sr = torchaudio.load("example.wav")
-    wave2, _ = torchaudio.load("example2.wav")
-    waveform = torch.cat((wave1, wave2))
-    print(waveform.size())
-
-    print(torch.stft(waveform, n_fft=512))
-
-    n_fft = 512
-
-    ps = BatchRandomPitchShift(-5, 5, sr, n_fft=n_fft, p=1).to(waveform.device)
-
-    steps = torch.tensor([-2, 0, 4], dtype=torch.long, device=waveform.device)
-    t1 = time.time()
-    shifted = ps(waveform, n_steps=steps)
-    t2 = time.time()
-    print(t2 - t1)

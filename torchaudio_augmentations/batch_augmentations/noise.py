@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple
 
 import torch
 
@@ -6,8 +6,15 @@ from .base import BatchRandomDataAugmentation
 
 
 class BatchRandomNoise(BatchRandomDataAugmentation):
-    def __init__(self, min_snr: float = 0.0001, max_snr: float = 0.01, p: float = 0.5, return_masks: bool = False):
-        super(BatchRandomNoise, self).__init__(p=p, return_masks=return_masks)
+    def __init__(
+            self,
+            min_snr: float = 0.0001,
+            max_snr: float = 0.01,
+            p: Optional[float] = None,
+            return_params: Optional[bool] = None,
+            return_masks: Optional[bool] = None
+    ):
+        super(BatchRandomNoise, self).__init__(p=p, return_params=return_params, return_masks=return_masks)
         self.sample_random_snr = self.uniform_sampling_fn(min_snr, max_snr)
 
     def apply_augmentation(
@@ -15,7 +22,7 @@ class BatchRandomNoise(BatchRandomDataAugmentation):
             audio_waveforms: torch.Tensor,
             mask: torch.BoolTensor,
             snr: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         batch_size = audio_waveforms.size(0)
         device = audio_waveforms.device
 
@@ -31,7 +38,7 @@ class BatchRandomNoise(BatchRandomDataAugmentation):
             self.expand_right(mask, audio_waveforms),
             audio_waveforms + noise,
             audio_waveforms
-        )
+        ), noise_std
 
 
 if __name__ == "__main__":

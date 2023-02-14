@@ -1,5 +1,5 @@
 import abc
-from typing import Optional
+from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -15,13 +15,14 @@ class BaseBatchRandomDataAugmentation(nn.Module, metaclass=abc.ABCMeta):
         return_masks (bool): whether masks indicating to which samples the
             augmentation has been applied must be returned
     """
-    def __init__(self, p: float = 0.5, return_masks: bool = False):
+    def __init__(self, p: Optional[float] = None, return_params: Optional[bool] = None, return_masks: Optional[bool] = None):
         super(BaseBatchRandomDataAugmentation, self).__init__()
         self.p = p
-        self.return_masks = return_masks
+        self.return_params = return_params
+        self.return_masks = False if return_params else return_masks
 
     def _compute_mask(self, length: int, device: torch.device) -> torch.BoolTensor:
-        return torch.rand(length, device=device) < self.p
+        return torch.rand(length, device=device).lt(self.p)
 
     @staticmethod
     def expand_right(to_expand: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
@@ -80,7 +81,10 @@ class BatchRandomDataAugmentation(BaseBatchRandomDataAugmentation):
             torch.BoolTensor (eventually): mask indicating which samples have been augmented
         """
         mask = self._compute_mask(x.size(0), x.device)
-        augmented_x = self.apply_augmentation(x, mask, **kwargs)
+        augmented_x, params = self.apply_augmentation(x, mask, **kwargs)
+
+        if self.return_params:
+            return augmented_x, params
 
         if self.return_masks:
             return augmented_x, mask
@@ -93,7 +97,7 @@ class BatchRandomDataAugmentation(BaseBatchRandomDataAugmentation):
             x: torch.Tensor,
             mask: torch.BoolTensor,
             **kwargs
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         r"""Apply the data augmentation to the samples of the batch that should be modified according to the mask
 
         Args:

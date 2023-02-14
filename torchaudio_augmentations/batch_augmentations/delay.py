@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple
 
 import torch
 
@@ -29,7 +29,7 @@ class BatchRandomDelay(BatchRandomDataAugmentation):
             audio_waveforms: torch.Tensor,
             mask: torch.BoolTensor,
             delays: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         batch_size = audio_waveforms.size(0)
         num_samples = audio_waveforms.size(-1)
         device = audio_waveforms.device
@@ -45,7 +45,7 @@ class BatchRandomDelay(BatchRandomDataAugmentation):
         delayed_signals = audio_waveforms.gather(-1, self.expand_mid(indices, audio_waveforms))
         delayed_signals[self.expand_mid(invalid_indices, audio_waveforms)] = 0
 
-        return audio_waveforms + self.volume_factor * delayed_signals
+        return audio_waveforms + self.volume_factor * delayed_signals, delays
 
     def _calc_offset(self, delay_in_ms):
         return (self.sample_rate * delay_in_ms / 1000).long()

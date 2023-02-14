@@ -1,4 +1,5 @@
 import abc
+from typing import Tuple
 
 import torch
 import torch.nn as nn
@@ -30,20 +31,26 @@ class BatchRandomDataAugmentation(BaseBatchRandomDataAugmentation):
                 return x, mask
             return x
 
-        augmented_samples = self.apply_augmentation(x[mask], **kwargs)
-        augmented_x = x.scatter(
+        augmented_samples, params = self.apply_augmentation(x[mask], **kwargs)
+        x.scatter_(
             0,
             indices.expand_as(augmented_samples.view(indices.size(0), -1)).view_as(augmented_samples),
             augmented_samples
         )
 
-        if self.return_masks:
-            return augmented_x, mask
+        if self.return_params:
+            augmented_params = torch.empty_like(mask, dtype=torch.float)
+            augmented_params.fill_(self.default_param)
+            augmented_params.scatter_(0, indices.squeeze(1), params)
+            return x, augmented_params
 
-        return augmented_x
+        if self.return_masks:
+            return x, mask
+
+        return x
 
     @abc.abstractmethod
-    def apply_augmentation(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
+    def apply_augmentation(self, x: torch.Tensor, **kwargs) -> Tuple[torch.Tensor, torch.Tensor]:
         r"""Apply the data augmentation to the samples of the batch that should be modified according to the mask
 
         Args:
@@ -54,6 +61,10 @@ class BatchRandomDataAugmentation(BaseBatchRandomDataAugmentation):
             torch.Tensor: batch with randomly transformed samples according to mask
         """
         pass
+
+    @property
+    def default_param(self):
+        return 1
 
 
 def BatchRandomApply(module: nn.Module):

@@ -15,6 +15,7 @@ class import_batch_random_data_augmentation(BaseBatchRandomDataAugmentation):
         augmentation = getattr(augmentation_module, self.augmentation_name)
         return augmentation(*args, **kwargs)
 
+
 BatchRandomDelay = import_batch_random_data_augmentation("BatchRandomDelay", "delay")
 BatchRandomGain = import_batch_random_data_augmentation("BatchRandomGain", "gain")
 BatchRandomNoise = import_batch_random_data_augmentation("BatchRandomNoise", "noise")

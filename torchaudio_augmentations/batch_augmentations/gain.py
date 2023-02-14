@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple
 
 import torch
 
@@ -15,7 +15,7 @@ class BatchRandomGain(BatchRandomDataAugmentation):
             audio_waveforms: torch.Tensor,
             mask: torch.BoolTensor,
             gains_db: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         batch_size = audio_waveforms.size(0)
         device = audio_waveforms.device
 
@@ -29,7 +29,7 @@ class BatchRandomGain(BatchRandomDataAugmentation):
             self.expand_right(mask, audio_waveforms),
             self.expand_right(ratios, audio_waveforms) * audio_waveforms,
             audio_waveforms
-        )
+        ), gains_db
 
 
 if __name__ == "__main__":
