@@ -63,6 +63,11 @@ class BaseBatchRandomDataAugmentation(nn.Module, metaclass=abc.ABCMeta):
             return tensor
         return sample_uniform
 
+    @staticmethod
+    def gaussint_sampling_fn(min_value, max_value):
+        pass
+
+
 
 class BatchRandomDataAugmentation(BaseBatchRandomDataAugmentation):
     def forward(self, x: torch.Tensor, **kwargs):

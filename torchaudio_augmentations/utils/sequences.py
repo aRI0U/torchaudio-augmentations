@@ -6,6 +6,8 @@ from torch.nn.utils.rnn import PackedSequence
 
 
 def pad_or_trim(tensor: torch.Tensor, length: int) -> torch.Tensor:
+    if length == tensor.size(-1):
+        return tensor
     if length > tensor.size(-1):
         return pad(tensor, (0, length - tensor.size(-1)))
     return tensor[..., :length]

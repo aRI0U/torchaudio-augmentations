@@ -23,10 +23,11 @@ class BatchRandomPitchShift(BatchRandomDataAugmentation):
             resampling_method: str = "sinc_interpolation",
             minimal_gcd: int = 1,
             resampling_dtype: torch.dtype = torch.float32,
-            p: Optional[float] = None,
+            p: Optional[bool] = None,
+            return_params: Optional[bool] = None,
             return_masks: Optional[bool] = None
     ):
-        super(BatchRandomPitchShift, self).__init__(p=p, return_masks=return_masks)
+        super(BatchRandomPitchShift, self).__init__(p=p, return_params=return_params, return_masks=return_masks)
         self.sample_random_steps = self.randint_sampling_fn(min_steps, max_steps)
 
         self.sample_rate = sample_rate

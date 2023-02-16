@@ -13,10 +13,11 @@ class BatchRandomDelay(BatchRandomDataAugmentation):
             min_delay: int = 200,
             max_delay: int = 500,
             delay_interval: int = 50,
-            p: float = 0.5,
-            return_masks: bool = False
+            p: Optional[bool] = None,
+            return_params: Optional[bool] = None,
+            return_masks: Optional[bool] = None
     ):
-        super(BatchRandomDelay, self).__init__(p=p, return_masks=return_masks)
+        super(BatchRandomDelay, self).__init__(p=p, return_params=return_params, return_masks=return_masks)
         self.sample_rate = sample_rate
         self.volume_factor = volume_factor
         self.delay_interval = delay_interval

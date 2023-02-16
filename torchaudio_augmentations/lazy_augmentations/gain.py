@@ -6,8 +6,15 @@ from .base import BatchRandomDataAugmentation
 
 
 class BatchRandomGain(BatchRandomDataAugmentation):
-    def __init__(self, min_gain_db: float = -6., max_gain_db: float = 0., p: float = 0.5, return_masks: bool = False):
-        super(BatchRandomGain, self).__init__(p=p, return_masks=return_masks)
+    def __init__(
+            self,
+            min_gain_db: float = -6.,
+            max_gain_db: float = 0.,
+            p: Optional[bool] = None,
+            return_params: Optional[bool] = None,
+            return_masks: Optional[bool] = None
+    ):
+        super(BatchRandomGain, self).__init__(p=p, return_params=return_params, return_masks=return_masks)
         self.sample_random_gains = self.uniform_sampling_fn(min_gain_db, max_gain_db)
 
     def apply_augmentation(self, audio_waveforms: torch.Tensor, gains_db: Optional[torch.Tensor] = None) -> torch.Tensor:
