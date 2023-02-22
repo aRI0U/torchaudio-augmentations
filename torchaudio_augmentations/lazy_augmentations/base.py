@@ -27,6 +27,10 @@ class BatchRandomDataAugmentation(BaseBatchRandomDataAugmentation):
         indices = torch.argwhere(mask)
 
         if indices.size(0) == 0:
+            if self.return_params:
+                params = torch.empty_like(mask, dtype=torch.float)
+                params.fill_(self.default_param)
+                return x, params
             if self.return_masks:
                 return x, mask
             return x

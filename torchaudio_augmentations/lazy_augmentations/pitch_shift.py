@@ -31,7 +31,8 @@ class BatchRandomPitchShift(BatchRandomDataAugmentation):
             return_masks: Optional[bool] = None
     ):
         super(BatchRandomPitchShift, self).__init__(p=p, return_params=return_params, return_masks=return_masks)
-        self.sample_random_steps = self.randint_sampling_fn(min_steps, max_steps) if uniform else None
+        self.sample_random_steps = self.randint_sampling_fn(min_steps, max_steps) \
+            if uniform else self.gaussint_sampling_fn(min_steps, max_steps)
 
         self.sample_rate = sample_rate
         self.n_fft = n_fft
@@ -78,6 +79,10 @@ class BatchRandomPitchShift(BatchRandomDataAugmentation):
             mask[n_steps == 0] = False
 
         if mask.sum() == 0:
+            if self.return_params:
+                params = torch.empty_like(mask, dtype=torch.float)
+                params.fill_(self.default_param)
+                return x, params
             if self.return_masks:
                 return x, mask
             return x

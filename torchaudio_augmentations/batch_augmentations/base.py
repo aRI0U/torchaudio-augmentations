@@ -65,8 +65,11 @@ class BaseBatchRandomDataAugmentation(nn.Module, metaclass=abc.ABCMeta):
 
     @staticmethod
     def gaussint_sampling_fn(min_value, max_value):
-        pass
-
+        mean = (min_value + max_value) / 2
+        std = (max_value - mean) / 3
+        def sample_gaussint(*size, **kwargs):
+            return torch.randn(size, **kwargs).add_(mean).mul_(std).long()
+        return sample_gaussint
 
 
 class BatchRandomDataAugmentation(BaseBatchRandomDataAugmentation):
