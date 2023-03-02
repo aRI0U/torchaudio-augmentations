@@ -21,22 +21,22 @@ class BatchRandomGain(BatchRandomDataAugmentation):
             self,
             audio_waveforms: torch.Tensor,
             mask: torch.BoolTensor,
-            gains_db: Optional[torch.Tensor] = None
+            params: Optional[torch.Tensor] = None
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         batch_size = audio_waveforms.size(0)
         device = audio_waveforms.device
 
-        if gains_db is None:
-            gains_db = self.sample_random_gains(batch_size, device=device)
+        if params is None:
+            params = self.sample_random_gains(batch_size, device=device)
 
         # compute ratios corresponding to gain in dB
-        ratios = torch.full((batch_size,), 10, device=device).pow(gains_db / 20)
+        ratios = torch.full((batch_size,), 10, device=device).pow(params / 20)
 
         return torch.where(
             self.expand_right(mask, audio_waveforms),
             self.expand_right(ratios, audio_waveforms) * audio_waveforms,
             audio_waveforms
-        ), gains_db
+        ), params
 
 
 if __name__ == "__main__":

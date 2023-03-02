@@ -17,13 +17,13 @@ class BatchRandomNoise(BatchRandomDataAugmentation):
         super(BatchRandomNoise, self).__init__(p=p, return_params=return_params, return_masks=return_masks)
         self.sample_random_snr = self.uniform_sampling_fn(min_snr, max_snr)
 
-    def apply_augmentation(self, audio_waveforms: torch.Tensor, snr: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def apply_augmentation(self, audio_waveforms: torch.Tensor, params: Optional[torch.Tensor] = None) -> torch.Tensor:
         batch_size = audio_waveforms.size(0)
         device = audio_waveforms.device
 
-        if snr is None:
-            snr = self.sample_random_snr(batch_size, device=device)
-        noise_std = snr * audio_waveforms.view(batch_size, -1).std(dim=-1)
+        if params is None:
+            params = self.sample_random_snr(batch_size, device=device)
+        noise_std = params * audio_waveforms.view(batch_size, -1).std(dim=-1)
 
         # compute ratios corresponding to gain in dB
         noise = self.expand_right(noise_std, audio_waveforms) * torch.randn_like(audio_waveforms)

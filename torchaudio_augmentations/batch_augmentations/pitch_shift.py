@@ -58,23 +58,36 @@ class BatchRandomPitchShift(BatchRandomDataAugmentation):
             self,
             audio_waveforms: torch.Tensor,
             mask: torch.BoolTensor,
-            n_steps: Optional[torch.LongTensor] = None
+            params: Optional[torch.Tensor] = None
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        if n_steps is None:
-            n_steps = self.sample_random_steps(audio_waveforms.size(0), device=audio_waveforms.device)
+        r"""Apply pitch-shift batchwise with different shift ratios
+
+        Args:
+            audio_waveforms (torch.Tensor): batch of waveforms to be pitch-shited, shape (batch_size, *)
+            mask (torch.BoolTensor): mask indicating to which samples the transform should be applied to,
+                shape (batch_size)
+            params (torch.Tensor): frequency ratios to pitch-shift, shape (batch_size). If `params` is a
+                LongTensor, its values are interpreted as semitones and converted automatically to frequency
+                ratios. If `None`, frequency ratios are randomly sampled.
+        """
+        if params is None:
+            params = self.sample_random_steps(audio_waveforms.size(0), device=audio_waveforms.device)
+        if not torch.is_floating_point(params):  # eventually convert semitones to frequency ratios
+            params = 2 ** (params.float() / self.bins_per_octave)
+        params[~mask] = self.default_param
 
         return torch.where(
             self.expand_right(mask, audio_waveforms),
-            self.pitch_shift(audio_waveforms, n_steps),
+            self.pitch_shift(audio_waveforms, params),
             audio_waveforms
-        ), 2 ** (n_steps / self.bins_per_octave)
+        ), params
 
-    def pitch_shift(self, waveforms: torch.Tensor, n_steps: torch.LongTensor) -> torch.Tensor:
+    def pitch_shift(self, waveforms: torch.Tensor, freq_ratios: torch.LongTensor) -> torch.Tensor:
         r"""Performs batch-wise pitch-shift
 
         Args:
             waveforms (torch.Tensor): batch of audio waveforms, shape (batch_size, *, num_samples)
-            n_steps (torch.LongTensor): number of steps to pitch-shift for each sample, shape (batch_size)
+            freq_ratios (torch.LongTensor): frequency ratios to pitch-shift for each sample, shape (batch_size)
 
         Returns:
             torch.Tensor: batch of pitch-shifted tensors, same shape as `waveforms`
@@ -83,23 +96,23 @@ class BatchRandomPitchShift(BatchRandomDataAugmentation):
 
         # pack batch
         waveforms = waveforms.reshape(-1, waveforms.size(-1))
-        n_steps = n_steps.repeat_interleave(waveforms.size(0) // n_steps.size(0))
+        freq_ratios = freq_ratios.repeat_interleave(waveforms.size(0) // freq_ratios.size(0))
 
         # time-stretch in Fourier domain
-        rates = 2.0 ** (-n_steps.float().div(self.bins_per_octave))
+        # rates = 2.0 ** (-n_steps.float().div(self.bins_per_octave))
 
-        wave_stretch = self._stretch_waveform(waveforms, rates)
+        wave_stretch = self._stretch_waveform(waveforms, 1 / freq_ratios)
 
         # resample time-stretched waveforms
-        sample_rate = torch.full_like(n_steps, self.sample_rate)
+        sample_rate = torch.full_like(freq_ratios, self.sample_rate)
         wave_shift = resample(
             wave_stretch,
-            (sample_rate / rates).long(),
-            sample_rate,
+            (sample_rate * freq_ratios).long(),
+            sample_rate.long(),
             minimal_gcd=self.minimal_gcd,
             **self.resampling_kwargs
         )
-        # print(wave_shift.size())
+
         return pad_or_trim(wave_shift, waveforms.size(-1)).view(original_shape)
 
     def _stretch_waveform(self, waveforms: torch.Tensor, rates: torch.Tensor) -> torch.Tensor:

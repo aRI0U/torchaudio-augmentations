@@ -30,6 +30,22 @@ class BatchRandomPitchShift(BatchRandomDataAugmentation):
             return_params: Optional[bool] = None,
             return_masks: Optional[bool] = None
     ):
+        r"""
+
+        Args:
+            ...  # TODO: finish this
+            minimal_gcd (int): increase this value for reducing memory usage, at the cost of possibly
+                less precise computations.
+            n_chunks (int): number of chunks per batch, increase this value for reducing memory usage
+            autoscale_n_chunks: deprecated
+            print_oom_warnings (bool): whether user should be warned when there is an OOM
+            p (float): probability to apply the transform. If `None`, use the global value instead
+            uniform (bool): whether number of steps should be sampled uniformly between `min_steps` and `max_steps`.
+                Otherwise, it is sampled from a gaussian
+            return_params (bool): whether parameters (frequency ratios) of the transform should be returned
+            return_masks (bool): whether mask indicating to which sample the transform has been applied
+                should be returned
+        """
         super(BatchRandomPitchShift, self).__init__(p=p, return_params=return_params, return_masks=return_masks)
         self.sample_random_steps = self.randint_sampling_fn(min_steps, max_steps) \
             if uniform else self.gaussint_sampling_fn(min_steps, max_steps)
@@ -65,7 +81,7 @@ class BatchRandomPitchShift(BatchRandomDataAugmentation):
         self.autoscale_n_chunks = autoscale_n_chunks
         self.print_oom_warnings = print_oom_warnings
 
-    def forward(self, x: torch.Tensor, n_steps: Optional[torch.LongTensor] = None):
+    def forward(self, x: torch.Tensor, params: Optional[torch.Tensor] = None):
         r"""See the parent class for the detailed documentation. In order to save some computation time,
         we sample the number of steps directly in the forward pass and mask inputs whose selected `n_steps`
         is 0.
@@ -74,14 +90,15 @@ class BatchRandomPitchShift(BatchRandomDataAugmentation):
 
         mask = self._compute_mask(x.size(0), x.device)
 
-        if n_steps is None:
-            n_steps = self.sample_random_steps(x.size(0), device=x.device)
-            mask[n_steps == 0] = False
+        if params is None:
+            params = self.sample_random_steps(x.size(0), device=x.device)
+            mask[params == 0] = False
+        if not torch.is_floating_point(params):
+            params = 2 ** (params.float() / self.bins_per_octave)
+        params[~mask] = self.default_param
 
         if mask.sum() == 0:
             if self.return_params:
-                params = torch.empty_like(mask, dtype=torch.float)
-                params.fill_(self.default_param)
                 return x, params
             if self.return_masks:
                 return x, mask
@@ -89,7 +106,7 @@ class BatchRandomPitchShift(BatchRandomDataAugmentation):
 
         indices = torch.argwhere(mask)
 
-        augmented_samples, params = self.apply_augmentation(x[mask], n_steps=n_steps[mask])
+        augmented_samples, params = self.apply_augmentation(x[mask], params[mask])
         x.scatter_(
             0,
             indices.expand_as(augmented_samples.view(indices.size(0), -1)).view_as(augmented_samples),
@@ -110,16 +127,16 @@ class BatchRandomPitchShift(BatchRandomDataAugmentation):
     def apply_augmentation(
             self,
             audio_waveforms: torch.Tensor,
-            n_steps: torch.LongTensor = None
+            params: torch.Tensor = None
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        return self.pitch_shift(audio_waveforms, n_steps), 2 ** (n_steps / self.bins_per_octave)
+        return self.pitch_shift(audio_waveforms, params), params
 
-    def pitch_shift(self, waveforms: torch.Tensor, n_steps: torch.LongTensor) -> torch.Tensor:
+    def pitch_shift(self, waveforms: torch.Tensor, freq_ratios: torch.Tensor) -> torch.Tensor:
         r"""Performs batch-wise pitch-shift
 
         Args:
             waveforms (torch.Tensor): batch of audio waveforms, shape (batch_size, *, num_samples)
-            n_steps (torch.LongTensor): number of steps to pitch-shift for each sample, shape (batch_size)
+            freq_ratios (torch.Tensor): frequency ratios to pitch-shift for each sample, shape (batch_size)
 
         Returns:
             torch.Tensor: batch of pitch-shifted tensors, same shape as `waveforms`
@@ -128,16 +145,16 @@ class BatchRandomPitchShift(BatchRandomDataAugmentation):
 
         # pack batch
         waveforms = waveforms.reshape(-1, waveforms.size(-1))
-        n_steps = n_steps.repeat_interleave(waveforms.size(0) // n_steps.size(0))
+        freq_ratios = freq_ratios.repeat_interleave(waveforms.size(0) // freq_ratios.size(0))
 
         # time-stretch in Fourier domain
-        rates = 2.0 ** (-n_steps.float().div(self.bins_per_octave))
+        # rates = 2.0 ** (-n_steps.float().div(self.bins_per_octave))
 
-        wave_stretch = self._stretch_waveform(waveforms, rates)
+        wave_stretch = self._stretch_waveform(waveforms, 1 / freq_ratios)
         # print(wave_stretch.size(), original_shape[-1] / rates)
         # resample time-stretched waveforms
-        sample_rate = torch.full_like(n_steps, self.sample_rate)
-        orig_freq = (sample_rate / rates).long()
+        sample_rate = torch.full_like(freq_ratios, self.sample_rate, dtype=torch.long)
+        orig_freq = (sample_rate * freq_ratios).long()
         try:
             wave_shift = self._resample(
                 wave_stretch,
@@ -164,14 +181,6 @@ class BatchRandomPitchShift(BatchRandomDataAugmentation):
                     pad_size=waveforms.size(-1),
                     n_chunks=self.n_chunks+1
                 )
-
-                # eventually increase permanently the number of chunks
-                # if self.steps_counter > 10 and self.oom_counter / self.steps_counter > self.autoscale_n_chunks:
-                #     print("Caught too many OOM, increasing the default number of chunks")
-                #     self.n_chunks += 1
-                #     self.oom_counter = 0
-                #     self.steps_counter = 0
-
             else:
                 raise e
 

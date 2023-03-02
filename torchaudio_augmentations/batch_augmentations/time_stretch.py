@@ -32,16 +32,16 @@ class BatchRandomTimeStretch(BatchRandomDataAugmentation):
             self,
             complex_specgrams: torch.Tensor,
             mask: torch.BoolTensor,
-            rates: Optional[torch.Tensor] = None
+            params: Optional[torch.Tensor] = None
     ):
-        if rates is None:
-            rates = self.sample_random_rates(complex_specgrams.size(0), device=complex_specgrams.device)
+        if params is None:
+            params = self.sample_random_rates(complex_specgrams.size(0), device=complex_specgrams.device)
 
         num_samples = complex_specgrams.size(-1)
 
         return torch.where(
             self.expand_right(mask, complex_specgrams),
-            phase_vocoder(complex_specgrams, rates, self.phase_advance, pad_length=num_samples),
+            phase_vocoder(complex_specgrams, params, self.phase_advance, pad_length=num_samples),
             complex_specgrams
         )
 

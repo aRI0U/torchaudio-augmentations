@@ -25,15 +25,15 @@ class BatchRandomDelay(BatchRandomDataAugmentation):
         self.sample_random_delays = self.randint_sampling_fn(min_delay // delay_interval,
                                                              max_delay // delay_interval + 1)
 
-    def apply_augmentation(self, audio_waveforms: torch.Tensor, delays: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def apply_augmentation(self, audio_waveforms: torch.Tensor, params: Optional[torch.Tensor] = None) -> torch.Tensor:
         batch_size = audio_waveforms.size(0)
         num_samples = audio_waveforms.size(-1)
         device = audio_waveforms.device
 
-        if delays is None:
-            delays = self.delay_interval * self.sample_random_delays(batch_size, device=device)
+        if params is None:
+            params = self.delay_interval * self.sample_random_delays(batch_size, device=device)
 
-        offsets = self._calc_offset(delays)
+        offsets = self._calc_offset(params)
         indices = torch.arange(num_samples, device=device).unsqueeze(0) - offsets.unsqueeze(1)
         invalid_indices = indices < 0
         indices.masked_fill_(invalid_indices, 0)

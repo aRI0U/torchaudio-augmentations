@@ -21,15 +21,15 @@ class BatchRandomNoise(BatchRandomDataAugmentation):
             self,
             audio_waveforms: torch.Tensor,
             mask: torch.BoolTensor,
-            snr: Optional[torch.Tensor] = None
+            params: Optional[torch.Tensor] = None
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         batch_size = audio_waveforms.size(0)
         device = audio_waveforms.device
 
-        if snr is None:
-            snr = self.sample_random_snr(batch_size, device=device)
+        if params is None:
+            params = self.sample_random_snr(batch_size, device=device)
 
-        noise_std = snr * audio_waveforms.view(batch_size, -1).std(dim=-1)
+        noise_std = params * audio_waveforms.view(batch_size, -1).std(dim=-1)
 
         # compute ratios corresponding to gain in dB
         noise = self.expand_right(noise_std, audio_waveforms) * torch.randn_like(audio_waveforms)

@@ -66,10 +66,6 @@ class BatchRandomDataAugmentation(BaseBatchRandomDataAugmentation):
         """
         pass
 
-    @property
-    def default_param(self):
-        return 1
-
 
 def BatchRandomApply(module: nn.Module):
     r"""Workaround to enable to directly transform classical data augmentations

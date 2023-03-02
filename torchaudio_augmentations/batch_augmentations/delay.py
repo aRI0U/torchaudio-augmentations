@@ -29,16 +29,16 @@ class BatchRandomDelay(BatchRandomDataAugmentation):
             self,
             audio_waveforms: torch.Tensor,
             mask: torch.BoolTensor,
-            delays: Optional[torch.Tensor] = None
+            params: Optional[torch.Tensor] = None
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         batch_size = audio_waveforms.size(0)
         num_samples = audio_waveforms.size(-1)
         device = audio_waveforms.device
 
-        if delays is None:
-            delays = self.delay_interval * self.sample_random_delays(batch_size, device=device)
+        if params is None:
+            params = self.delay_interval * self.sample_random_delays(batch_size, device=device)
 
-        offsets = self._calc_offset(delays)
+        offsets = self._calc_offset(params)
         indices = torch.arange(num_samples, device=device).unsqueeze(0) - offsets.unsqueeze(1)
         invalid_indices = torch.logical_or(~mask.unsqueeze(1), indices < 0)
         indices[invalid_indices] = 0
@@ -46,7 +46,7 @@ class BatchRandomDelay(BatchRandomDataAugmentation):
         delayed_signals = audio_waveforms.gather(-1, self.expand_mid(indices, audio_waveforms))
         delayed_signals[self.expand_mid(invalid_indices, audio_waveforms)] = 0
 
-        return audio_waveforms + self.volume_factor * delayed_signals, delays
+        return audio_waveforms + self.volume_factor * delayed_signals, params
 
     def _calc_offset(self, delay_in_ms):
         return (self.sample_rate * delay_in_ms / 1000).long()

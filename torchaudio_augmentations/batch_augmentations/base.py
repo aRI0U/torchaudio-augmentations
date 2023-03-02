@@ -71,6 +71,10 @@ class BaseBatchRandomDataAugmentation(nn.Module, metaclass=abc.ABCMeta):
             return torch.randn(size, **kwargs).add_(mean).mul_(std).long()
         return sample_gaussint
 
+    @property
+    def default_param(self):
+        return 1
+
 
 class BatchRandomDataAugmentation(BaseBatchRandomDataAugmentation):
     def forward(self, x: torch.Tensor, **kwargs):
